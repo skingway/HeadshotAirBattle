@@ -1,0 +1,47 @@
+{
+  "rules": {
+    // Shared: Active games (Web & App)
+    "activeGames": {
+      "$gameId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    // Web: Matchmaking
+    "matchmaking": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    // Web: Rooms
+    "rooms": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    // Web: User presence
+    "presence": {
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $userId"
+      }
+    },
+
+    // Web: Game state
+    "gameState": {
+      "$gameId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    // App: Room codes (6-character codes)
+    "roomCodes": {
+      ".read": "auth != null",
+      "$roomCode": {
+        ".write": "auth != null && (!data.exists() || data.child('hostId').val() == auth.uid)"
+      }
+    }
+  }
+}

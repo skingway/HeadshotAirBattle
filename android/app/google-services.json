@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "262233081033",
+    "firebase_url": "https://airplane-battle-7a3fd-default-rtdb.firebaseio.com",
+    "project_id": "airplane-battle-7a3fd",
+    "storage_bucket": "airplane-battle-7a3fd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:262233081033:android:a50819635887cf411ab918",
+        "android_client_info": {
+          "package_name": "com.headshotairbattle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBaEwwZ7rk67JY59qzkv_FXR6VOrO8AWYE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
