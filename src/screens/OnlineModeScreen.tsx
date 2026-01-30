@@ -10,6 +10,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  ScrollView,
   TextInput,
   Alert,
   ActivityIndicator,
@@ -99,7 +100,7 @@ export default function OnlineModeScreen({navigation}: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Online Multiplayer</Text>
@@ -194,7 +195,7 @@ export default function OnlineModeScreen({navigation}: Props) {
           onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>← Back to Menu</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -204,9 +205,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a2e',
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  content: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     alignItems: 'center',

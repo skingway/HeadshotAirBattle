@@ -48,7 +48,7 @@ class RoomServiceClass {
         const userRoomsRef = database().ref('activeGames');
         const userRoomsSnapshot = await withTimeout(
           userRoomsRef.orderByChild('player1/id').equalTo(userId).once('value'),
-          5000,
+          30000,
           'Timeout cleaning user rooms'
         );
 
@@ -74,7 +74,7 @@ class RoomServiceClass {
         try {
           const existingRoom = await withTimeout(
             database().ref(`roomCodes/${roomCode}`).once('value'),
-            5000,
+            30000,
             'Timeout checking room code'
           );
 
@@ -120,14 +120,14 @@ class RoomServiceClass {
       console.log('[RoomService] Saving room code mapping...');
       await withTimeout(
         database().ref(`roomCodes/${roomCode}`).set(roomData),
-        10000,
+        30000,
         'Failed to save room code: Connection timeout'
       );
 
       // Set up auto-delete after expiry
       await withTimeout(
         database().ref(`roomCodes/${roomCode}`).onDisconnect().remove(),
-        5000,
+        30000,
         'Failed to setup auto-delete'
       );
 
@@ -156,7 +156,7 @@ class RoomServiceClass {
       console.log('[RoomService] Looking up room code...');
       const roomSnapshot = await withTimeout(
         database().ref(`roomCodes/${normalizedCode}`).once('value'),
-        10000,
+        30000,
         'Failed to find room: Connection timeout. Please check your internet connection.'
       );
 

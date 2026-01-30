@@ -46,13 +46,33 @@ export default function OnlineGameScreen({navigation, route}: Props) {
   const {gameId} = route.params;
   const [phase, setPhase] = useState<GamePhase>('deploying');
   const [gameState, setGameState] = useState<GameState | null>(null);
-  const [playerBoard, setPlayerBoard] = useState<BoardManager | null>(null);
-  const [opponentBoard, setOpponentBoard] = useState<BoardManager | null>(null);
   const [gameLog, setGameLog] = useState<string[]>([]);
   const [isMyTurn, setIsMyTurn] = useState<boolean>(false);
+  const [renderKey, setRenderKey] = useState<number>(0); // Force re-render counter
+
+  // Use refs for boards to prevent re-creation on state updates
+  const playerBoardRef = useRef<BoardManager | null>(null);
+  const opponentBoardRef = useRef<BoardManager | null>(null);
   const myRole = useRef<'player1' | 'player2' | null>(null);
-  const battleStarted = useRef<boolean>(false);
   const phaseRef = useRef<GamePhase>('deploying');
+
+  // Helper to prevent backwards phase transitions
+  const transitionToPhase = useCallback((newPhase: GamePhase, reason?: string) => {
+    const phaseOrder: GamePhase[] = ['deploying', 'waiting', 'countdown', 'battle', 'gameover'];
+    const currentIndex = phaseOrder.indexOf(phaseRef.current);
+    const newIndex = phaseOrder.indexOf(newPhase);
+
+    // Allow transition if moving forward or staying in same phase
+    if (newIndex >= currentIndex) {
+      if (phaseRef.current !== newPhase) {
+        console.log(`[OnlineGameScreen] Phase transition: ${phaseRef.current} → ${newPhase}${reason ? ` (${reason})` : ''}`);
+        phaseRef.current = newPhase;
+        setPhase(newPhase);
+      }
+    } else {
+      console.log(`[OnlineGameScreen] Blocked backwards transition: ${phaseRef.current} → ${newPhase}`);
+    }
+  }, []);
 
   // Initialize audio
   useEffect(() => {
@@ -107,34 +127,27 @@ export default function OnlineGameScreen({navigation, route}: Props) {
 
         // Both deployed AND both have board data
         if (myPlayer?.ready && opponent?.ready && myPlayer?.board && opponent?.board) {
-          console.log('[OnlineGameScreen] Both players ready AND have board data, creating opponent board');
+          console.log('[OnlineGameScreen] Both players ready AND have board data');
+          console.log('[OnlineGameScreen] Board data exists - myPlayer:', !!myPlayer?.board, 'opponent:', !!opponent?.board);
+          // Just transition to countdown and wait for server to change status to 'battle'
+          // The battle will be started automatically by MultiplayerService.submitBoard()
           createOpponentBoard(opponent, state);
-          phaseRef.current = 'countdown';
-          setPhase('countdown');
-
-          // Start the battle if not already started (any player can trigger it)
-          if (!battleStarted.current) {
-            console.log('[OnlineGameScreen] I am', myRole.current, ', starting battle...');
-            battleStarted.current = true;
-            startBattle(state);
-          } else {
-            console.log('[OnlineGameScreen] Battle already started by other player');
-          }
+          transitionToPhase('countdown', 'both players ready, waiting for battle status');
         } else {
           console.log('[OnlineGameScreen] Waiting for board data - myPlayer.board:', !!myPlayer?.board, 'opponent.board:', !!opponent?.board);
         }
       } else if (myPlayer?.ready && !opponent?.ready) {
         // We're ready, waiting for opponent
         console.log('[OnlineGameScreen] Waiting for opponent to deploy');
-        setPhase('waiting');
+        transitionToPhase('waiting', 'waiting for opponent');
         addLog(`Waiting for ${opponent?.nickname || 'opponent'} to deploy...`);
       }
     } else if (state.status === 'battle') {
-      console.log('[OnlineGameScreen] Battle status received, current phase:', phase);
+      console.log('[OnlineGameScreen] Battle status received, phaseRef.current:', phaseRef.current);
 
-      // Create boards if they don't exist but players are ready
-      if (!playerBoard && myPlayer?.ready && myPlayer?.board) {
-        console.log('[OnlineGameScreen] Creating player board from Firebase data');
+      // Create boards ONCE if they don't exist
+      if (!playerBoardRef.current && myPlayer?.ready && myPlayer?.board) {
+        console.log('[OnlineGameScreen] Creating player board ONCE from Firebase data');
         const board = new BoardManager(state.boardSize, state.airplaneCount);
         myPlayer.board.airplanes.forEach((airplaneData: any) => {
           const airplane = new Airplane(
@@ -145,18 +158,29 @@ export default function OnlineGameScreen({navigation, route}: Props) {
           );
           board.airplanes.push(airplane);
         });
-        setPlayerBoard(board);
+        playerBoardRef.current = board;
+        setRenderKey(prev => prev + 1); // Force render
       }
 
-      if (!opponentBoard && opponent?.ready && opponent?.board) {
-        console.log('[OnlineGameScreen] Creating opponent board from Firebase data');
-        createOpponentBoard(opponent, state);
+      if (!opponentBoardRef.current && opponent?.ready && opponent?.board) {
+        console.log('[OnlineGameScreen] Creating opponent board ONCE from Firebase data');
+        const board = new BoardManager(state.boardSize, state.airplaneCount);
+        opponent.board.airplanes.forEach((airplaneData: any) => {
+          const airplane = new Airplane(
+            airplaneData.headRow,
+            airplaneData.headCol,
+            airplaneData.direction,
+            airplaneData.id
+          );
+          board.airplanes.push(airplane);
+        });
+        opponentBoardRef.current = board;
+        setRenderKey(prev => prev + 1); // Force render
       }
 
+      // Transition to battle phase
       if (phaseRef.current !== 'battle') {
-        console.log('[OnlineGameScreen] Switching to battle phase, current phase:', phaseRef.current);
-        phaseRef.current = 'battle';
-        setPhase('battle');
+        transitionToPhase('battle', 'Firebase status is battle');
         addLog('Battle started!');
       }
 
@@ -165,12 +189,11 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       setIsMyTurn(state.currentTurn === userId);
 
       // Sync opponent's attacks to our board
-      if (opponent?.attacks && playerBoard) {
+      if (opponent?.attacks && playerBoardRef.current) {
         syncOpponentAttacks(opponent.attacks);
       }
     } else if (state.status === 'finished') {
-      phaseRef.current = 'gameover';
-      setPhase('gameover');
+      transitionToPhase('gameover', 'game finished');
       const userId = AuthService.getUserId();
       const didWin = state.winner === userId;
 
@@ -225,7 +248,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
     return () => {
       MultiplayerService.offStateChange(handleStateChange);
     };
-  }, []);
+  }, [transitionToPhase]);
 
   const createOpponentBoard = (opponent: any, state: GameState) => {
     if (!state || !opponent.board) {
@@ -248,48 +271,32 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       board.airplanes.push(airplane);
     });
 
-    setOpponentBoard(board);
+    opponentBoardRef.current = board;
+    setRenderKey(prev => prev + 1); // Force render
   };
 
   const syncOpponentAttacks = (attacks: Array<{row: number; col: number; result: string; timestamp: number}>) => {
+    const playerBoard = playerBoardRef.current;
     if (!playerBoard) return;
+
+    let hasNewAttacks = false;
 
     // Apply all opponent attacks to our board
     attacks.forEach(attack => {
       if (!playerBoard.isCellAttacked(attack.row, attack.col)) {
         playerBoard.processAttack(attack.row, attack.col);
+        hasNewAttacks = true;
       }
     });
 
-    // Force re-render
-    setPlayerBoard({...playerBoard});
-  };
-
-  const startBattle = async (state: GameState) => {
-    if (!state || !state.gameId) {
-      console.error('[OnlineGameScreen] Cannot start battle: state is invalid', state);
-      return;
-    }
-
-    console.log('[OnlineGameScreen] Starting battle with gameId:', state.gameId);
-    console.log('[OnlineGameScreen] First turn player:', state.player1?.id);
-
-    try {
-      // Update game status to 'battle' and set first turn
-      const gameRef = database().ref(`activeGames/${state.gameId}`);
-      console.log('[OnlineGameScreen] Calling update...');
-      await gameRef.update({
-        status: 'battle',
-        currentTurn: state.player1?.id || null,
-        turnStartedAt: Date.now(),
-      });
-
-      console.log('[OnlineGameScreen] ✓ Battle started!');
-    } catch (error) {
-      console.error('[OnlineGameScreen] ✗ Error starting battle:', error);
-      console.error('[OnlineGameScreen] Error details:', JSON.stringify(error));
+    // Force re-render if there were new attacks
+    if (hasNewAttacks) {
+      setRenderKey(prev => prev + 1);
     }
   };
+
+  // Battle is now started automatically by MultiplayerService.submitBoard()
+  // No need for manual startBattle function
 
   const handleDeploymentComplete = async (deployedBoard: BoardManager) => {
     console.log('[OnlineGameScreen] Deployment complete, submitting to server...');
@@ -301,7 +308,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       return;
     }
 
-    setPlayerBoard(deployedBoard);
+    playerBoardRef.current = deployedBoard;
 
     // Submit board to server
     const success = await MultiplayerService.submitBoard({
@@ -316,23 +323,19 @@ export default function OnlineGameScreen({navigation, route}: Props) {
     if (success) {
       await MultiplayerService.setReady(true);
       addLog('Deployment submitted! Waiting for opponent...');
-      // Only set to waiting if still in deploying phase
-      if (phaseRef.current === 'deploying') {
-        phaseRef.current = 'waiting';
-        setPhase('waiting');
-      }
+      transitionToPhase('waiting', 'deployment complete');
     } else {
       Alert.alert('Error', 'Failed to submit deployment');
     }
   };
 
   const handleCountdownComplete = () => {
-    phaseRef.current = 'battle';
-    setPhase('battle');
+    transitionToPhase('battle', 'countdown complete');
     addLog('Battle started!');
   };
 
   const handleCellPress = async (row: number, col: number) => {
+    const opponentBoard = opponentBoardRef.current;
     if (phase !== 'battle' || !isMyTurn || !opponentBoard || !gameState) {
       return;
     }
@@ -376,7 +379,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
     }
 
     // Force re-render to show attack result
-    setOpponentBoard({...opponentBoard});
+    setRenderKey(prev => prev + 1);
   };
 
   const handleSurrender = () => {
@@ -499,12 +502,13 @@ export default function OnlineGameScreen({navigation, route}: Props) {
         )}
       </View>
 
-      {phase === 'battle' && playerBoard && opponentBoard && (
+      {phase === 'battle' && playerBoardRef.current && opponentBoardRef.current && (
         <ScrollView style={styles.contentScroll} contentContainerStyle={styles.contentScrollContainer}>
           <View style={styles.battleContainer}>
             <DualBoardView
-              playerBoard={playerBoard}
-              enemyBoard={opponentBoard}
+              key={renderKey}
+              playerBoard={playerBoardRef.current}
+              enemyBoard={opponentBoardRef.current}
               currentTurn={isMyTurn ? 'player' : 'ai'}
               onCellPress={handleCellPress}
               showEnemyAirplanes={false}
@@ -544,9 +548,25 @@ export default function OnlineGameScreen({navigation, route}: Props) {
             style={styles.menuButton}
             onPress={async () => {
               await MultiplayerService.leaveGame();
-              navigation.navigate('OnlineMode');
+              // Reset navigation stack to OnlineMode
+              navigation.reset({
+                index: 0,
+                routes: [{name: 'OnlineMode'}],
+              });
             }}>
-            <Text style={styles.menuButtonText}>Back to Menu</Text>
+            <Text style={styles.menuButtonText}>Back to Online Menu</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.menuButton, {backgroundColor: '#607D8B', marginTop: 16}]}
+            onPress={async () => {
+              await MultiplayerService.leaveGame();
+              // Navigate back to main menu
+              navigation.reset({
+                index: 0,
+                routes: [{name: 'MainMenu'}],
+              });
+            }}>
+            <Text style={styles.menuButtonText}>Back to Main Menu</Text>
           </TouchableOpacity>
         </View>
       )}

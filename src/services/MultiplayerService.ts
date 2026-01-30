@@ -147,7 +147,7 @@ class MultiplayerServiceClass {
       console.log('[MultiplayerService] Saving game to Firebase...');
       await withTimeout(
         database().ref(`activeGames/${gameId}`).set(gameData),
-        10000,
+        30000,
         'Failed to create game: Connection timeout. Please check your internet connection.'
       );
 
@@ -184,7 +184,7 @@ class MultiplayerServiceClass {
       const gameRef = database().ref(`activeGames/${gameId}`);
       const snapshot = await withTimeout(
         gameRef.once('value'),
-        10000,
+        30000,
         'Failed to join game: Connection timeout. Please check your internet connection.'
       );
 
@@ -233,14 +233,14 @@ class MultiplayerServiceClass {
           attacks: [],
           stats: { hits: 0, misses: 0, kills: 0 },
         }),
-        10000,
+        30000,
         'Failed to join game: Connection timeout'
       );
 
       // Update status to deploying
       await withTimeout(
         gameRef.child('status').set('deploying'),
-        10000,
+        30000,
         'Failed to update game status'
       );
 
@@ -377,9 +377,51 @@ class MultiplayerServiceClass {
 
     try {
       const { gameId, role } = this.currentGame;
+
+      // Upload board data first
+      console.log('[MultiplayerService] Uploading board data...');
       await database().ref(`activeGames/${gameId}/${role}/board`).set(board);
+
+      // Verify board data was saved successfully
+      const boardCheck = await database().ref(`activeGames/${gameId}/${role}/board`).once('value');
+      if (!boardCheck.exists()) {
+        console.error('[MultiplayerService] Board data upload failed!');
+        return false;
+      }
+      console.log('[MultiplayerService] ✓ Board data uploaded and verified');
+
+      // Now mark as ready
       await database().ref(`activeGames/${gameId}/${role}/ready`).set(true);
-      console.log('[MultiplayerService] Board submitted');
+      console.log('[MultiplayerService] ✓ Marked as ready');
+
+      // Check if both players are ready AND both have board data (like web version)
+      const gameSnapshot = await database().ref(`activeGames/${gameId}`).once('value');
+      const gameData = gameSnapshot.val();
+
+      console.log('[MultiplayerService] Current state:');
+      console.log('[MultiplayerService] - P1 ready:', gameData?.player1?.ready, 'P1 board:', !!gameData?.player1?.board);
+      console.log('[MultiplayerService] - P2 ready:', gameData?.player2?.ready, 'P2 board:', !!gameData?.player2?.board);
+      console.log('[MultiplayerService] - Status:', gameData?.status);
+
+      // IMPORTANT: Check both ready AND both have board data before starting battle
+      if (gameData?.player1?.ready && gameData?.player2?.ready &&
+          gameData?.player1?.board && gameData?.player2?.board &&
+          gameData?.status !== 'battle') {
+        // Both ready with board data, start the battle
+        const firstPlayerId = gameData.player1?.id;
+        console.log('[MultiplayerService] Both ready with board data! Starting battle, first turn:', firstPlayerId);
+
+        await database().ref(`activeGames/${gameId}`).update({
+          status: 'battle',
+          currentTurn: firstPlayerId, // Use player1's userId
+          turnStartedAt: Date.now(),
+        });
+
+        console.log('[MultiplayerService] ✓ Battle started automatically');
+      } else {
+        console.log('[MultiplayerService] Waiting for opponent (ready & board data)...');
+      }
+
       return true;
     } catch (error) {
       console.error('[MultiplayerService] Error submitting board:', error);
