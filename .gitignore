@@ -48,6 +48,14 @@ yarn-error.log
 # For more information about the recommended setup visit:
 # https://docs.fastlane.tools/best-practices/source-control/
 
+# Sound Effects (not included in repo - download separately)
+#
+android/app/src/main/res/raw/*.mp3
+android/app/src/main/res/raw/*.wav
+android/app/src/main/res/raw/*.ogg
+ios/*/sounds/*.mp3
+ios/*/sounds/*.wav
+
 **/fastlane/report.xml
 **/fastlane/Preview.html
 **/fastlane/screenshots

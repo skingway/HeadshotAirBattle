@@ -114,10 +114,13 @@ class AudioManager {
   }
 
   /**
-   * Play sound effect
+   * Play sound effect with vibration
    */
   playSFX(soundName: 'miss' | 'hit' | 'kill' | 'victory' | 'defeat'): void {
     if (!this.enabled) return;
+
+    // Always play vibration for tactile feedback
+    this.playVibration(soundName);
 
     const sound = this.sounds.get(soundName);
 
@@ -128,35 +131,38 @@ class AudioManager {
         sound.play((success) => {
           if (!success) {
             console.warn(`Failed to play sound: ${soundName}`);
-            this.playVibrationFallback(soundName);
           }
         });
       });
     } else {
-      // Fallback to vibration if sound not loaded
-      console.log(`Sound not loaded, using vibration: ${soundName}`);
-      this.playVibrationFallback(soundName);
+      // Sound not loaded, but vibration already played
+      console.log(`Sound not loaded for: ${soundName}, using vibration only`);
     }
   }
 
   /**
-   * Vibration fallback for when sound files are not available
+   * Play vibration feedback (complements sound effects)
    */
-  private playVibrationFallback(soundName: string): void {
+  private playVibration(soundName: string): void {
     switch (soundName) {
       case 'miss':
+        // Light tap - miss
         Vibration.vibrate(50);
         break;
       case 'hit':
+        // Medium pulse - hit
         Vibration.vibrate(100);
         break;
       case 'kill':
+        // Strong double pulse - kill
         Vibration.vibrate([0, 100, 50, 100]);
         break;
       case 'victory':
+        // Celebratory pattern
         Vibration.vibrate([0, 50, 50, 50, 50, 100]);
         break;
       case 'defeat':
+        // Sad pattern
         Vibration.vibrate([0, 200, 100, 200]);
         break;
     }
