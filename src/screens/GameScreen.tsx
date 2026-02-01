@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  StatusBar,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RouteProp} from '@react-navigation/native';
@@ -23,6 +24,7 @@ import DualBoardView from '../components/DualBoardView';
 import StatisticsService from '../services/StatisticsService';
 import AuthService from '../services/AuthService';
 import {AchievementService} from '../services/AchievementService';
+import {useOrientation} from '../hooks/useOrientation';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -59,6 +61,19 @@ export default function GameScreen({navigation, route}: Props) {
   const [timeRemaining, setTimeRemaining] = useState<number>(GameConstants.TURN_TIMER.DURATION);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Screen orientation
+  const orientation = useOrientation();
+  const isLandscape = orientation === 'landscape';
+
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Toggle fullscreen
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+    StatusBar.setHidden(!isFullscreen);
+  };
 
   // Initialize game and audio
   useEffect(() => {
@@ -695,63 +710,80 @@ export default function GameScreen({navigation, route}: Props) {
   // Show deployment phase
   if (phase === 'deployment') {
     return (
-      <DeploymentPhase
-        boardSize={boardSize}
-        airplaneCount={airplaneCount}
-        onDeploymentComplete={handleDeploymentComplete}
-        onCancel={() => navigation.goBack()}
-      />
+      <>
+        <StatusBar hidden={false} backgroundColor="#16213e" barStyle="light-content" />
+        <DeploymentPhase
+          boardSize={boardSize}
+          airplaneCount={airplaneCount}
+          onDeploymentComplete={handleDeploymentComplete}
+          onCancel={() => navigation.goBack()}
+        />
+      </>
     );
   }
 
   // Show countdown phase (3-second countdown)
   if (phase === 'countdown') {
     return (
-      <CountdownScreen onComplete={handleCountdownComplete} />
+      <>
+        <StatusBar hidden={false} backgroundColor="#16213e" barStyle="light-content" />
+        <CountdownScreen onComplete={handleCountdownComplete} />
+      </>
     );
   }
 
   // Show battle/gameover phase
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Headshot: Air Battle</Text>
-        <Text style={styles.difficulty}>
+      <StatusBar hidden={isFullscreen} backgroundColor="#16213e" barStyle="light-content" />
+      <View style={[styles.header, isLandscape && styles.headerLandscape]}>
+        {!isLandscape && (
+          <Text style={styles.title}>Headshot: Air Battle</Text>
+        )}
+        <Text style={[styles.difficulty, isLandscape && styles.difficultyLandscape]}>
           {difficulty.toUpperCase()} AI
         </Text>
         {phase === 'battle' && (
           <>
-            <Text style={styles.turnIndicator}>
+            <Text style={[styles.turnIndicator, isLandscape && styles.turnIndicatorLandscape]}>
               {currentTurn === 'player' ? '🎯 Your Turn' : '🤖 AI Turn'}
             </Text>
-            <View style={styles.timerContainer}>
+            <View style={[styles.timerContainer, isLandscape && styles.timerContainerLandscape]}>
               {currentTurn === 'player' ? (
                 <Text style={[
                   styles.timerText,
+                  isLandscape && styles.timerTextLandscape,
                   timeRemaining <= GameConstants.TURN_TIMER.WARNING_THRESHOLD && styles.timerWarning
                 ]}>
                   ⏱️ {(timeRemaining / 1000).toFixed(1)}s
                 </Text>
               ) : (
-                <Text style={styles.timerText}>
+                <Text style={[styles.timerText, isLandscape && styles.timerTextLandscape]}>
                   🤔 AI Thinking...
                 </Text>
               )}
             </View>
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Turn</Text>
-                <Text style={styles.statValue}>{turnCount}</Text>
+            <View style={[styles.statsRow, isLandscape && styles.statsRowLandscape]}>
+              <View style={[styles.statBox, isLandscape && styles.statBoxLandscape]}>
+                <Text style={[styles.statLabel, isLandscape && styles.statLabelLandscape]}>Turn</Text>
+                <Text style={[styles.statValue, isLandscape && styles.statValueLandscape]}>{turnCount}</Text>
               </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Your Hits</Text>
-                <Text style={styles.statValue}>{playerStats.hits}/{playerStats.hits + playerStats.misses}</Text>
+              <View style={[styles.statBox, isLandscape && styles.statBoxLandscape]}>
+                <Text style={[styles.statLabel, isLandscape && styles.statLabelLandscape]}>Hits</Text>
+                <Text style={[styles.statValue, isLandscape && styles.statValueLandscape]}>{playerStats.hits}/{playerStats.hits + playerStats.misses}</Text>
               </View>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Your Kills</Text>
-                <Text style={styles.statValue}>{playerStats.kills}/{airplaneCount}</Text>
+              <View style={[styles.statBox, isLandscape && styles.statBoxLandscape]}>
+                <Text style={[styles.statLabel, isLandscape && styles.statLabelLandscape]}>Kills</Text>
+                <Text style={[styles.statValue, isLandscape && styles.statValueLandscape]}>{playerStats.kills}/{airplaneCount}</Text>
               </View>
             </View>
+            <TouchableOpacity
+              style={[styles.fullscreenButton, isLandscape && styles.fullscreenButtonLandscape]}
+              onPress={toggleFullscreen}>
+              <Text style={[styles.fullscreenButtonText, isLandscape && styles.fullscreenButtonTextLandscape]}>
+                {isFullscreen ? '⛶' : '⛶'}
+              </Text>
+            </TouchableOpacity>
           </>
         )}
       </View>
@@ -814,8 +846,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
   },
   header: {
-    padding: 15,
+    padding: 8,
+    paddingVertical: 10,
     backgroundColor: '#16213e',
+    alignItems: 'center',
+  },
+  headerLandscape: {
+    padding: 4,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   title: {
@@ -826,25 +866,44 @@ const styles = StyleSheet.create({
   difficulty: {
     fontSize: 14,
     color: '#4CAF50',
-    marginTop: 5,
+    marginTop: 3,
+  },
+  difficultyLandscape: {
+    fontSize: 11,
+    marginTop: 0,
+    marginLeft: 5,
   },
   turnIndicator: {
     fontSize: 16,
     color: '#FFD700',
-    marginTop: 10,
+    marginTop: 6,
     fontWeight: 'bold',
   },
+  turnIndicatorLandscape: {
+    fontSize: 12,
+    marginTop: 0,
+    marginLeft: 5,
+  },
   timerContainer: {
-    marginTop: 8,
+    marginTop: 5,
     paddingHorizontal: 20,
-    paddingVertical: 6,
+    paddingVertical: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
+  },
+  timerContainerLandscape: {
+    marginTop: 0,
+    marginLeft: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
   timerText: {
     fontSize: 18,
     color: '#4CAF50',
     fontWeight: 'bold',
+  },
+  timerTextLandscape: {
+    fontSize: 11,
   },
   timerWarning: {
     color: '#FF5722',
@@ -852,8 +911,14 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 10,
+    marginTop: 6,
     width: '100%',
+  },
+  statsRowLandscape: {
+    marginTop: 0,
+    marginLeft: 'auto',
+    width: 'auto',
+    gap: 5,
   },
   statBox: {
     alignItems: 'center',
@@ -862,15 +927,52 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     minWidth: 80,
   },
+  statBoxLandscape: {
+    padding: 3,
+    minWidth: 50,
+  },
   statLabel: {
     fontSize: 10,
     color: '#aaa',
     marginBottom: 3,
   },
+  statLabelLandscape: {
+    fontSize: 8,
+    marginBottom: 1,
+  },
   statValue: {
     fontSize: 14,
     color: '#4CAF50',
     fontWeight: 'bold',
+  },
+  statValueLandscape: {
+    fontSize: 10,
+  },
+  fullscreenButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    padding: 8,
+    borderRadius: 5,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenButtonLandscape: {
+    top: 4,
+    right: 4,
+    padding: 4,
+    width: 28,
+    height: 28,
+  },
+  fullscreenButtonText: {
+    fontSize: 20,
+    color: '#fff',
+  },
+  fullscreenButtonTextLandscape: {
+    fontSize: 16,
   },
   content: {
     flex: 1,

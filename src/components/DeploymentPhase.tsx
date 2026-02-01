@@ -17,6 +17,7 @@ import BoardManager from '../core/BoardManager';
 import Airplane from '../core/Airplane';
 import DraggableAirplane from './DraggableAirplane';
 import SkinService from '../services/SkinService';
+import {useOrientation} from '../hooks/useOrientation';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
@@ -44,9 +45,30 @@ export default function DeploymentPhase({
   const isBoardReadyRef = useRef(false);
   const [, forceUpdate] = useState(0); // For UI updates
 
+  // Detect orientation changes
+  const orientation = useOrientation();
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
+
+  // Listen to dimension changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({window}) => {
+      setDimensions(window);
+      // Reset board ready flag to trigger remeasure
+      isBoardReadyRef.current = false;
+      setTimeout(() => forceUpdate(prev => prev + 1), 100);
+    });
+
+    return () => subscription?.remove();
+  }, []);
+
   // Calculate dynamic cell size based on screen width and board size
-  const screenWidth = Dimensions.get('window').width;
-  const availableWidth = Math.min(screenWidth - BOARD_PADDING * 2 - 40, 500);
+  const screenWidth = dimensions.width;
+  const screenHeight = dimensions.height;
+  const isLandscape = orientation === 'landscape';
+
+  // In landscape, use a larger portion of screen width, but cap it
+  const maxWidth = isLandscape ? Math.min(screenHeight * 0.6, 600) : Math.min(screenWidth - BOARD_PADDING * 2 - 40, 500);
+  const availableWidth = maxWidth;
   const cellSize = Math.floor((availableWidth - boardSize * 2) / boardSize);
 
   // 拖拽预览状态

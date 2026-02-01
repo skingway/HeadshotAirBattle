@@ -5,10 +5,11 @@
  * - Player board (small): Defensive overview
  */
 
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions} from 'react-native';
 import BoardManager from '../core/BoardManager';
 import SkinService from '../services/SkinService';
+import {useOrientation} from '../hooks/useOrientation';
 
 interface DualBoardViewProps {
   playerBoard: BoardManager;
@@ -25,17 +26,40 @@ export default function DualBoardView({
   onCellPress,
   showEnemyAirplanes = false,
 }: DualBoardViewProps) {
-  const screenWidth = Dimensions.get('window').width;
+  const orientation = useOrientation();
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   const boardSize = enemyBoard.size;
 
-  // Calculate cell sizes for responsive design
-  // Enemy board: larger, main interaction area
-  const enemyBoardWidth = Math.min(screenWidth - 40, 380);
-  const enemyCellSize = Math.floor((enemyBoardWidth - boardSize * 2) / boardSize);
+  // Listen to dimension changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({window}) => {
+      setDimensions(window);
+    });
 
-  // Player board: smaller defensive overview
-  const playerBoardWidth = Math.min(screenWidth * 0.45, 200);
-  const playerCellSize = Math.floor((playerBoardWidth - boardSize * 2) / boardSize);
+    return () => subscription?.remove();
+  }, []);
+
+  const screenWidth = dimensions.width;
+  const screenHeight = dimensions.height;
+  const isLandscape = orientation === 'landscape';
+
+  // Calculate cell sizes for responsive design
+  let enemyCellSize: number;
+  let playerCellSize: number;
+
+  if (isLandscape) {
+    // Landscape: boards side by side
+    const availableWidth = (screenWidth - 60) / 2; // Split screen for two boards
+    enemyCellSize = Math.floor((availableWidth - boardSize * 2) / boardSize);
+    playerCellSize = Math.floor((availableWidth - boardSize * 2) / boardSize);
+  } else {
+    // Portrait: boards stacked vertically (original layout)
+    const enemyBoardWidth = Math.min(screenWidth - 40, 380);
+    enemyCellSize = Math.floor((enemyBoardWidth - boardSize * 2) / boardSize);
+
+    const playerBoardWidth = Math.min(screenWidth * 0.45, 200);
+    playerCellSize = Math.floor((playerBoardWidth - boardSize * 2) / boardSize);
+  }
 
   // Helper: Check if a cell has an airplane
   const getAirplaneAtPosition = (board: BoardManager, row: number, col: number) => {
@@ -163,10 +187,10 @@ export default function DualBoardView({
   };
 
   return (
-    <View style={styles.container}>
-      {/* Enemy Board (Large) - Main Attack Target */}
-      <View style={styles.enemyBoardContainer}>
-        <Text style={styles.boardTitle}>🎯 Enemy Board (Attack Here)</Text>
+    <View style={[styles.container, isLandscape && styles.containerLandscape]}>
+      {/* Enemy Board - Main Attack Target */}
+      <View style={[styles.enemyBoardContainer, isLandscape && styles.boardContainerLandscape]}>
+        <Text style={[styles.boardTitle, isLandscape && styles.boardTitleLandscape]}>🎯 Enemy</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -175,9 +199,9 @@ export default function DualBoardView({
         </ScrollView>
       </View>
 
-      {/* Player Board (Smaller) - Defensive Overview - Below Enemy Board */}
-      <View style={styles.playerBoardContainer}>
-        <Text style={styles.playerBoardTitle}>🛡️ Your Defense</Text>
+      {/* Player Board - Defensive Overview */}
+      <View style={[styles.playerBoardContainer, isLandscape && styles.boardContainerLandscape]}>
+        <Text style={[styles.playerBoardTitle, isLandscape && styles.boardTitleLandscape]}>🛡️ Defense</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -192,6 +216,18 @@ export default function DualBoardView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  containerLandscape: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 10,
+  },
+  boardContainerLandscape: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  boardTitleLandscape: {
+    fontSize: 14,
   },
   enemyBoardContainer: {
     alignItems: 'center',

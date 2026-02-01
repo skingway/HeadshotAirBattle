@@ -155,7 +155,7 @@ export const BOARD_THEMES: BoardTheme[] = [
     description: 'Sleek dark theme',
     icon: '🌑',
     unlockRequirement: 10,
-    unlockText: 'Win 5 games',
+    unlockText: 'Win 10 games',
     colors: {
       cellEmpty: '#111827',
       cellAirplane: '#6b7280',
@@ -172,7 +172,7 @@ export const BOARD_THEMES: BoardTheme[] = [
     description: 'Vibrant pink and purple',
     icon: '💗',
     unlockRequirement: 20,
-    unlockText: 'Win 10 games',
+    unlockText: 'Win 20 games',
     colors: {
       cellEmpty: '#2d1428',
       cellAirplane: '#ec4899',
@@ -189,7 +189,7 @@ export const BOARD_THEMES: BoardTheme[] = [
     description: 'Warm sunset colors',
     icon: '🌅',
     unlockRequirement: 30,
-    unlockText: 'Win 20 games',
+    unlockText: 'Win 30 games',
     colors: {
       cellEmpty: '#2d1810',
       cellAirplane: '#ff8f00',
@@ -206,7 +206,7 @@ export const BOARD_THEMES: BoardTheme[] = [
     description: 'Natural forest tones',
     icon: '🌲',
     unlockRequirement: 40,
-    unlockText: 'Win 30 games',
+    unlockText: 'Win 40 games',
     colors: {
       cellEmpty: '#1a2e1a',
       cellAirplane: '#4caf50',
