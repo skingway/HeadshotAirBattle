@@ -211,9 +211,11 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       });
 
       // Save game history
+      const playerBoard = playerBoardRef.current;
+      const opponentBoard = opponentBoardRef.current;
       if (gameState && playerBoard && opponentBoard) {
         const historyData = {
-          gameType: 'online',
+          gameType: 'online' as const,
           opponent: opponent?.nickname || 'Unknown',
           winner: state.winner || '',
           boardSize: state.boardSize,
