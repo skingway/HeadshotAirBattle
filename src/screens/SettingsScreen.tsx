@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import AudioManager from '../services/AudioManager';
+import AuthService from '../services/AuthService';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -25,10 +28,77 @@ export default function SettingsScreen({navigation}: Props) {
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [bgmVolume, setBgmVolume] = useState(0.3);
   const [sfxVolume, setSfxVolume] = useState(0.5);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [authProvider, setAuthProvider] = useState<string>('anonymous');
 
   useEffect(() => {
     loadSettings();
+    loadAuthStatus();
   }, []);
+
+  const loadAuthStatus = () => {
+    setAuthProvider(AuthService.getAuthProvider());
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsSigningIn(true);
+    try {
+      const result = await AuthService.signInWithGoogle();
+      if (result.success) {
+        Alert.alert('Success', 'Signed in with Google successfully!');
+        loadAuthStatus();
+      } else if (result.conflict) {
+        Alert.alert(
+          'Account Conflict',
+          result.message || 'This Google account is already linked to another player profile.',
+          [
+            {text: 'Cancel', style: 'cancel'},
+            {
+              text: 'Switch to that account',
+              onPress: async () => {
+                setIsSigningIn(true);
+                const switchResult = await AuthService.switchToGoogleAccount();
+                setIsSigningIn(false);
+                if (switchResult.success) {
+                  Alert.alert('Success', 'Switched to Google account!');
+                  loadAuthStatus();
+                } else {
+                  Alert.alert('Error', switchResult.message || 'Failed to switch account.');
+                }
+              },
+            },
+          ],
+        );
+      } else if (result.message && result.message !== 'Sign-in cancelled.') {
+        Alert.alert('Sign-In Failed', result.message);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred.');
+    }
+    setIsSigningIn(false);
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Sign out? You can sign in again anytime.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AuthService.signOut();
+              loadAuthStatus();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to sign out.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const loadSettings = () => {
     const settings = AudioManager.getSettings();
@@ -122,6 +192,36 @@ export default function SettingsScreen({navigation}: Props) {
             onPress={() => AudioManager.playSFX('hit')}>
             <Text style={styles.testButtonText}>Test Sound</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Account Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Status</Text>
+            <Text style={[styles.accountStatus, authProvider === 'google' && styles.accountStatusGoogle]}>
+              {authProvider === 'google' ? 'Google' : authProvider === 'offline' ? 'Offline' : 'Guest'}
+            </Text>
+          </View>
+          {authProvider !== 'google' && authProvider !== 'offline' && (
+            <TouchableOpacity
+              style={[styles.signInButton, isSigningIn && styles.signInButtonDisabled]}
+              onPress={handleGoogleSignIn}
+              disabled={isSigningIn}>
+              {isSigningIn ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.signInButtonText}>Sign in with Google</Text>
+              )}
+            </TouchableOpacity>
+          )}
+          {authProvider === 'google' && (
+            <TouchableOpacity
+              style={styles.signOutSettingsButton}
+              onPress={handleSignOut}>
+              <Text style={styles.signOutSettingsButtonText}>Sign Out</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* App Info Section */}
@@ -241,6 +341,39 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 14,
     color: '#fff',
+    fontWeight: 'bold',
+  },
+  accountStatus: {
+    fontSize: 14,
+    color: '#aaa',
+    fontWeight: 'bold',
+  },
+  accountStatusGoogle: {
+    color: '#4285F4',
+  },
+  signInButton: {
+    backgroundColor: '#4285F4',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  signInButtonDisabled: {
+    opacity: 0.7,
+  },
+  signInButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  signOutSettingsButton: {
+    backgroundColor: '#D32F2F',
+    padding: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  signOutSettingsButtonText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   backButton: {

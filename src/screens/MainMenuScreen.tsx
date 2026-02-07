@@ -8,6 +8,9 @@ import {
   ScrollView,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {BannerAd, BannerAdSize} from 'react-native-google-mobile-ads';
+import AdService from '../services/AdService';
+import {AD_UNIT_IDS} from '../config/AdConfig';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -16,6 +19,7 @@ type RootStackParamList = {
   Profile: undefined;
   CustomMode: undefined;
   OnlineMode: undefined;
+  Store: undefined;
 };
 
 type Props = {
@@ -93,13 +97,19 @@ export default function MainMenuScreen({navigation}: Props) {
               <TouchableOpacity
                 style={[styles.smallButton, styles.profileButton]}
                 onPress={() => navigation.navigate('Profile')}>
-                <Text style={styles.smallButtonText}>👤 Profile</Text>
+                <Text style={styles.smallButtonText}>Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.smallButton, styles.shopButton]}
+                onPress={() => navigation.navigate('Store')}>
+                <Text style={styles.smallButtonText}>Shop</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.smallButton, styles.settingsButton]}
                 onPress={() => navigation.navigate('Settings')}>
-                <Text style={styles.smallButtonText}>⚙️ Settings</Text>
+                <Text style={styles.smallButtonText}>Settings</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -144,6 +154,15 @@ export default function MainMenuScreen({navigation}: Props) {
           </>
         )}
       </ScrollView>
+      {AdService.shouldShowBannerAd() && (
+        <View style={styles.bannerContainer}>
+          <BannerAd
+            unitId={AD_UNIT_IDS.BANNER_MAIN_MENU}
+            size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+            requestOptions={{requestNonPersonalizedAdsOnly: true}}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -233,6 +252,9 @@ const styles = StyleSheet.create({
   profileButton: {
     backgroundColor: '#2196F3',
   },
+  shopButton: {
+    backgroundColor: '#FFD700',
+  },
   settingsButton: {
     backgroundColor: '#607D8B',
   },
@@ -251,5 +273,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     opacity: 0.8,
     marginTop: 5,
+  },
+  bannerContainer: {
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
   },
 });

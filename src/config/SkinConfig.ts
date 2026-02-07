@@ -10,6 +10,8 @@ export interface AirplaneSkin {
   unlockRequirement: number;
   unlockText: string;
   color: string; // Main airplane color
+  isPremium?: boolean;
+  premiumPackId?: string;
 }
 
 export interface BoardTheme {
@@ -28,6 +30,8 @@ export interface BoardTheme {
     gridLine: string;
     background: string;
   };
+  isPremium?: boolean;
+  premiumPackId?: string;
 }
 
 // Airplane Skins - 12 colors
@@ -127,6 +131,47 @@ export const AIRPLANE_SKINS: AirplaneSkin[] = [
     unlockRequirement: 100,
     unlockText: 'Win 50 games',
     color: '#ff6b9d',
+  },
+  // Premium skins (IAP only)
+  {
+    id: 'diamond',
+    name: 'Diamond Blue',
+    description: 'Sparkling diamond gradient',
+    unlockRequirement: -1,
+    unlockText: 'Premium Skin Pack',
+    color: '#b9f2ff',
+    isPremium: true,
+    premiumPackId: 'premium_skin_pack',
+  },
+  {
+    id: 'stealth',
+    name: 'Stealth Black',
+    description: 'Matte black stealth',
+    unlockRequirement: -1,
+    unlockText: 'Premium Skin Pack',
+    color: '#2c2c2c',
+    isPremium: true,
+    premiumPackId: 'premium_skin_pack',
+  },
+  {
+    id: 'flame',
+    name: 'Flame Red',
+    description: 'Animated flame pattern',
+    unlockRequirement: -1,
+    unlockText: 'Premium Skin Pack',
+    color: '#ff4500',
+    isPremium: true,
+    premiumPackId: 'premium_skin_pack',
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora Green',
+    description: 'Northern lights shimmer',
+    unlockRequirement: -1,
+    unlockText: 'Premium Skin Pack',
+    color: '#00ff88',
+    isPremium: true,
+    premiumPackId: 'premium_skin_pack',
   },
 ];
 
@@ -284,6 +329,64 @@ export const BOARD_THEMES: BoardTheme[] = [
       gridLine: '#2e1a47',
       background: '#0a0118',
     },
+  },
+  // Premium themes (IAP only)
+  {
+    id: 'neon_city',
+    name: 'Neon City',
+    description: 'Cyberpunk neon colors',
+    icon: '🌃',
+    unlockRequirement: -1,
+    unlockText: 'Premium Theme Pack',
+    colors: {
+      cellEmpty: '#0d0d1a',
+      cellAirplane: '#00ffff',
+      cellHit: '#ff00ff',
+      cellMiss: '#1a1a3e',
+      cellKilled: '#ff0055',
+      gridLine: '#1a1a40',
+      background: '#050510',
+    },
+    isPremium: true,
+    premiumPackId: 'premium_theme_pack',
+  },
+  {
+    id: 'cherry_blossom',
+    name: 'Cherry Blossom',
+    description: 'Soft pink sakura theme',
+    icon: '🌸',
+    unlockRequirement: -1,
+    unlockText: 'Premium Theme Pack',
+    colors: {
+      cellEmpty: '#2d1a25',
+      cellAirplane: '#ffb7c5',
+      cellHit: '#ff6b81',
+      cellMiss: '#8b5e6b',
+      cellKilled: '#e63956',
+      gridLine: '#4a2a3a',
+      background: '#1a0f15',
+    },
+    isPremium: true,
+    premiumPackId: 'premium_theme_pack',
+  },
+  {
+    id: 'midnight_gold',
+    name: 'Midnight Gold',
+    description: 'Black and gold luxury theme',
+    icon: '🏆',
+    unlockRequirement: -1,
+    unlockText: 'Premium Theme Pack',
+    colors: {
+      cellEmpty: '#1a1400',
+      cellAirplane: '#ffd700',
+      cellHit: '#ff4500',
+      cellMiss: '#4a4000',
+      cellKilled: '#cc0000',
+      gridLine: '#332b00',
+      background: '#0d0a00',
+    },
+    isPremium: true,
+    premiumPackId: 'premium_theme_pack',
   },
 ];
 

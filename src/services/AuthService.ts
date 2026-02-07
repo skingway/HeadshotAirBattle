@@ -1,11 +1,13 @@
 /**
  * Authentication Service
  * Handles user authentication and profile management
+ * Supports: Anonymous Auth, Google Sign-In, Offline Mode
  */
 
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {GoogleSignin, statusCodes} from '@react-native-google-signin/google-signin';
 import FirebaseService from './FirebaseService';
 
 interface UserProfile {
@@ -14,6 +16,12 @@ interface UserProfile {
   nicknameChangedAt: number | null;
   createdAt: number;
   selectedBackground?: string;
+  // Google Sign-In fields
+  authProvider: 'anonymous' | 'google';
+  googleDisplayName?: string;
+  googleEmail?: string;
+  googlePhotoUrl?: string | null;
+  linkedAt?: number;
 }
 
 class AuthService {
@@ -92,7 +100,7 @@ class AuthService {
 
       if (savedProfile) {
         this.userProfile = JSON.parse(savedProfile);
-        console.log('[AuthService] ✓ Loaded offline profile:', this.userProfile?.nickname);
+        console.log('[AuthService] Loaded offline profile:', this.userProfile?.nickname);
       } else {
         // Create new offline profile
         const nickname = this.generateNickname();
@@ -103,19 +111,21 @@ class AuthService {
           nickname,
           nicknameChangedAt: null,
           createdAt: Date.now(),
+          authProvider: 'anonymous',
         };
 
         await AsyncStorage.setItem('offline_user_profile', JSON.stringify(this.userProfile));
-        console.log('[AuthService] ✓ Created offline profile:', nickname);
+        console.log('[AuthService] Created offline profile:', nickname);
       }
     } catch (error) {
-      console.error('[AuthService] ❌ Offline initialization failed:', error);
+      console.error('[AuthService] Offline initialization failed:', error);
       // Create minimal profile in memory
       this.userProfile = {
         userId: 'offline_temp',
         nickname: 'OfflinePilot',
         nicknameChangedAt: null,
         createdAt: Date.now(),
+        authProvider: 'anonymous',
       };
     }
   }
@@ -129,7 +139,7 @@ class AuthService {
       const userCredential = await auth().signInAnonymously();
       const user = userCredential.user;
 
-      console.log('[AuthService] ✓ Signed in anonymously:', user.uid);
+      console.log('[AuthService] Signed in anonymously:', user.uid);
       this.currentUser = user;
 
       // Create user profile if doesn't exist
@@ -137,9 +147,214 @@ class AuthService {
 
       return user;
     } catch (error) {
-      // Don't log error here - it will be caught by the timeout handler
-      // console.error('[AuthService] ❌ Anonymous sign in failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Sign in with Google
+   * If current user is anonymous, attempts to link the accounts to preserve data.
+   * If linking fails (account already linked elsewhere), offers to switch accounts.
+   */
+  async signInWithGoogle(): Promise<{
+    success: boolean;
+    message?: string;
+    conflict?: boolean;
+  }> {
+    if (FirebaseService.isOffline()) {
+      return {success: false, message: 'Sign-in requires internet connection.'};
+    }
+
+    try {
+      // Check if Google Play Services are available (Android)
+      await GoogleSignin.hasPlayServices({showPlayServicesUpdateDialog: true});
+
+      // Trigger Google Sign-In picker
+      const signInResult = await GoogleSignin.signIn();
+      const idToken = signInResult.data?.idToken;
+
+      if (!idToken) {
+        return {success: false, message: 'Failed to get Google credentials.'};
+      }
+
+      // Create Firebase credential from Google ID token
+      const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+
+      const currentUser = auth().currentUser;
+
+      // If user is currently anonymous, try to link accounts
+      if (currentUser && currentUser.isAnonymous) {
+        return await this.linkAnonymousToGoogle(googleCredential);
+      }
+
+      // Otherwise, sign in directly with Google
+      const userCredential = await auth().signInWithCredential(googleCredential);
+      const user = userCredential.user;
+      this.currentUser = user;
+
+      // Update profile with Google info
+      await this.updateProfileWithGoogleInfo(user);
+
+      console.log('[AuthService] Google Sign-In successful:', user.uid);
+      return {success: true};
+    } catch (error: any) {
+      // Handle Google Sign-In specific errors
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        return {success: false, message: 'Sign-in cancelled.'};
+      }
+      if (error.code === statusCodes.IN_PROGRESS) {
+        return {success: false, message: 'Sign-in already in progress.'};
+      }
+      if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        return {
+          success: false,
+          message: 'Google Play Services required. Please update.',
+        };
+      }
+
+      console.error('[AuthService] Google Sign-In failed:', error);
+      return {
+        success: false,
+        message: 'Sign-in failed. Please try again later.',
+      };
+    }
+  }
+
+  /**
+   * Link anonymous account with Google credential
+   * Preserves UID and all associated data
+   */
+  private async linkAnonymousToGoogle(
+    googleCredential: FirebaseAuthTypes.AuthCredential,
+  ): Promise<{success: boolean; message?: string; conflict?: boolean}> {
+    const currentUser = auth().currentUser;
+    if (!currentUser) {
+      return {success: false, message: 'No current user to link.'};
+    }
+
+    try {
+      // Attempt to link anonymous account with Google
+      const userCredential = await currentUser.linkWithCredential(googleCredential);
+      const user = userCredential.user;
+      this.currentUser = user;
+
+      // UID is preserved, update profile with Google info
+      await this.updateProfileWithGoogleInfo(user);
+
+      console.log('[AuthService] Anonymous account linked to Google:', user.uid);
+      return {success: true};
+    } catch (error: any) {
+      // credential-already-in-use: Google account is linked to a different Firebase user
+      if (
+        error.code === 'auth/credential-already-in-use' ||
+        error.code === 'auth/email-already-in-use'
+      ) {
+        console.warn(
+          '[AuthService] Google account already linked to another user',
+        );
+        return {
+          success: false,
+          message:
+            'This Google account is already linked to another player profile.',
+          conflict: true,
+        };
+      }
+
+      console.error('[AuthService] Account linking failed:', error);
+      return {
+        success: false,
+        message: 'Failed to link account. Please try again.',
+      };
+    }
+  }
+
+  /**
+   * Switch to existing Google account (when conflict detected)
+   * Signs out current anonymous user and signs in with Google
+   * The anonymous account data will be lost
+   */
+  async switchToGoogleAccount(): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      // Re-trigger Google Sign-In to get fresh credentials
+      const signInResult = await GoogleSignin.signIn();
+      const idToken = signInResult.data?.idToken;
+
+      if (!idToken) {
+        return {success: false, message: 'Failed to get Google credentials.'};
+      }
+
+      const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+
+      // Sign out current anonymous user
+      await auth().signOut();
+
+      // Sign in with Google credential
+      const userCredential = await auth().signInWithCredential(googleCredential);
+      const user = userCredential.user;
+      this.currentUser = user;
+
+      // Load the existing Google account's profile
+      await this.loadUserProfile(user.uid);
+
+      // Update with latest Google info
+      await this.updateProfileWithGoogleInfo(user);
+
+      console.log('[AuthService] Switched to Google account:', user.uid);
+      return {success: true};
+    } catch (error) {
+      console.error('[AuthService] Switch to Google account failed:', error);
+      return {
+        success: false,
+        message: 'Failed to switch account. Please try again.',
+      };
+    }
+  }
+
+  /**
+   * Update user profile with Google account information
+   */
+  private async updateProfileWithGoogleInfo(
+    user: FirebaseAuthTypes.User,
+  ): Promise<void> {
+    const googleInfo = user.providerData.find(
+      (p) => p.providerId === 'google.com',
+    );
+
+    const updates: Partial<UserProfile> = {
+      authProvider: 'google',
+      googleDisplayName: googleInfo?.displayName || user.displayName || undefined,
+      googleEmail: googleInfo?.email || user.email || undefined,
+      googlePhotoUrl: googleInfo?.photoURL || user.photoURL || null,
+      linkedAt: Date.now(),
+    };
+
+    try {
+      // Update Firestore
+      await firestore()
+        .collection('users')
+        .doc(user.uid)
+        .set(updates, {merge: true});
+
+      // Update local profile
+      if (this.userProfile) {
+        this.userProfile = {...this.userProfile, ...updates};
+      }
+
+      // Save to local storage
+      await AsyncStorage.setItem(
+        'offline_user_profile',
+        JSON.stringify(this.userProfile),
+      );
+
+      console.log('[AuthService] Profile updated with Google info');
+    } catch (error) {
+      console.error(
+        '[AuthService] Failed to update profile with Google info:',
+        error,
+      );
     }
   }
 
@@ -155,15 +370,35 @@ class AuthService {
         console.log('[AuthService] Creating new user profile...');
 
         const nickname = this.generateNickname();
+        const user = auth().currentUser;
+        const isGoogle =
+          user?.providerData.some((p) => p.providerId === 'google.com') ??
+          false;
+
         const profile: UserProfile = {
           userId,
           nickname,
           nicknameChangedAt: null,
           createdAt: Date.now(),
+          authProvider: isGoogle ? 'google' : 'anonymous',
         };
 
+        // If Google user, add Google info
+        if (isGoogle && user) {
+          const googleInfo = user.providerData.find(
+            (p) => p.providerId === 'google.com',
+          );
+          profile.googleDisplayName =
+            googleInfo?.displayName || user.displayName || undefined;
+          profile.googleEmail =
+            googleInfo?.email || user.email || undefined;
+          profile.googlePhotoUrl =
+            googleInfo?.photoURL || user.photoURL || null;
+          profile.linkedAt = Date.now();
+        }
+
         await firestore().collection('users').doc(userId).set(profile);
-        console.log('[AuthService] ✓ User profile created:', nickname);
+        console.log('[AuthService] User profile created:', nickname);
 
         this.userProfile = profile;
       } else {
@@ -171,7 +406,7 @@ class AuthService {
         await this.loadUserProfile(userId);
       }
     } catch (error) {
-      console.error('[AuthService] ❌ Failed to create user profile:', error);
+      console.error('[AuthService] Failed to create user profile:', error);
       // Don't throw, allow app to continue with offline mode
       console.log('[AuthService] Creating fallback offline profile...');
       const nickname = this.generateNickname();
@@ -180,8 +415,9 @@ class AuthService {
         nickname,
         nicknameChangedAt: null,
         createdAt: Date.now(),
+        authProvider: 'anonymous',
       };
-      console.log('[AuthService] ✓ Fallback profile created:', nickname);
+      console.log('[AuthService] Fallback profile created:', nickname);
     }
   }
 
@@ -196,8 +432,14 @@ class AuthService {
         const data = userDoc.data();
         // Validate that profile has required fields
         if (data && data.nickname && data.userId) {
-          this.userProfile = data as UserProfile;
-          console.log('[AuthService] ✓ User profile loaded:', this.userProfile.nickname);
+          this.userProfile = {
+            ...data,
+            authProvider: data.authProvider || 'anonymous',
+          } as UserProfile;
+          console.log(
+            '[AuthService] User profile loaded:',
+            this.userProfile.nickname,
+          );
         } else {
           // Profile exists but is incomplete, recreate it
           console.log('[AuthService] Profile incomplete, recreating...');
@@ -207,14 +449,21 @@ class AuthService {
             nickname,
             nicknameChangedAt: null,
             createdAt: Date.now(),
+            authProvider: 'anonymous',
           };
           await firestore().collection('users').doc(userId).set(profile);
           this.userProfile = profile;
-          console.log('[AuthService] ✓ User profile recreated:', nickname);
+          console.log('[AuthService] User profile recreated:', nickname);
         }
+
+        // Sync to local storage
+        await AsyncStorage.setItem(
+          'offline_user_profile',
+          JSON.stringify(this.userProfile),
+        );
       }
     } catch (error) {
-      console.error('[AuthService] ❌ Failed to load user profile:', error);
+      console.error('[AuthService] Failed to load user profile:', error);
     }
   }
 
@@ -282,10 +531,10 @@ class AuthService {
       // Save to local storage
       await AsyncStorage.setItem('offline_user_profile', JSON.stringify(this.userProfile));
 
-      console.log('[AuthService] ✓ Nickname updated:', newNickname);
+      console.log('[AuthService] Nickname updated:', newNickname);
       return { success: true };
     } catch (error) {
-      console.error('[AuthService] ❌ Failed to update nickname:', error);
+      console.error('[AuthService] Failed to update nickname:', error);
       return { success: false, message: 'Failed to update nickname' };
     }
   }
@@ -320,16 +569,65 @@ class AuthService {
   }
 
   /**
-   * Sign out
+   * Get auth provider type
+   */
+  getAuthProvider(): 'anonymous' | 'google' | 'offline' {
+    if (FirebaseService.isOffline() || !this.currentUser) {
+      return 'offline';
+    }
+    return this.userProfile?.authProvider || 'anonymous';
+  }
+
+  /**
+   * Check if user is linked to Google
+   */
+  isGoogleLinked(): boolean {
+    if (!this.currentUser) {
+      return false;
+    }
+    return this.currentUser.providerData.some(
+      (p) => p.providerId === 'google.com',
+    );
+  }
+
+  /**
+   * Sign out (handles both Google and anonymous sign-out)
+   * After sign-out, creates a new anonymous account
    */
   async signOut(): Promise<void> {
     try {
+      // Sign out from Google if signed in with Google
+      if (this.isGoogleLinked()) {
+        try {
+          await GoogleSignin.signOut();
+        } catch (googleError) {
+          console.warn('[AuthService] Google sign-out warning:', googleError);
+        }
+      }
+
+      // Sign out from Firebase
       await auth().signOut();
       this.currentUser = null;
       this.userProfile = null;
-      console.log('[AuthService] ✓ Signed out');
+
+      // Clear local profile cache
+      await AsyncStorage.removeItem('offline_user_profile');
+
+      console.log('[AuthService] Signed out');
+
+      // Create new anonymous account
+      try {
+        await this.signInAnonymously();
+        console.log('[AuthService] New anonymous account created after sign-out');
+      } catch (anonError) {
+        console.warn(
+          '[AuthService] Failed to create anonymous account after sign-out:',
+          anonError,
+        );
+        await this.initializeOfflineMode();
+      }
     } catch (error) {
-      console.error('[AuthService] ❌ Sign out failed:', error);
+      console.error('[AuthService] Sign out failed:', error);
       throw error;
     }
   }

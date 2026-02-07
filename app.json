@@ -1,4 +1,8 @@
 {
   "name": "HeadshotAirBattle",
-  "displayName": "HeadshotAirBattle"
+  "displayName": "HeadshotAirBattle",
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-3709728062444091~1673509748",
+    "ios_app_id": "ca-app-pub-3709728062444091~1673509748"
+  }
 }

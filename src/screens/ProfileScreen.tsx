@@ -1,6 +1,7 @@
 /**
  * Profile Screen
  * Displays user profile and statistics
+ * Supports Google Sign-In and account management
  */
 
 import React, {useState, useEffect, useCallback} from 'react';
@@ -13,11 +14,16 @@ import {
   ScrollView,
   TextInput,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
+import {BannerAd, BannerAdSize} from 'react-native-google-mobile-ads';
 import AuthService from '../services/AuthService';
 import StatisticsService from '../services/StatisticsService';
+import AdService from '../services/AdService';
+import {AD_UNIT_IDS} from '../config/AdConfig';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -37,6 +43,7 @@ export default function ProfileScreen({navigation}: Props) {
   const [newNickname, setNewNickname] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [statistics, setStatistics] = useState({
     totalGames: 0,
     wins: 0,
@@ -52,6 +59,7 @@ export default function ProfileScreen({navigation}: Props) {
   useFocusEffect(
     useCallback(() => {
       loadStatistics();
+      loadProfile();
     }, [])
   );
 
@@ -104,6 +112,78 @@ export default function ProfileScreen({navigation}: Props) {
     setIsEditing(false);
   };
 
+  const handleGoogleSignIn = async () => {
+    setIsSigningIn(true);
+    try {
+      const result = await AuthService.signInWithGoogle();
+
+      if (result.success) {
+        Alert.alert('Success', 'Signed in with Google successfully!');
+        loadProfile();
+      } else if (result.conflict) {
+        // Account conflict - ask user what to do
+        Alert.alert(
+          'Account Conflict',
+          result.message || 'This Google account is already linked to another player profile.',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Switch to that account',
+              onPress: async () => {
+                setIsSigningIn(true);
+                const switchResult = await AuthService.switchToGoogleAccount();
+                setIsSigningIn(false);
+                if (switchResult.success) {
+                  Alert.alert('Success', 'Switched to Google account!');
+                  loadProfile();
+                } else {
+                  Alert.alert('Error', switchResult.message || 'Failed to switch account.');
+                }
+              },
+            },
+          ],
+        );
+      } else if (result.message) {
+        // Only show alert for actual errors, not cancellation
+        if (result.message !== 'Sign-in cancelled.') {
+          Alert.alert('Sign-In Failed', result.message);
+        }
+      }
+    } catch (error) {
+      console.error('[ProfileScreen] Google Sign-In error:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    }
+    setIsSigningIn(false);
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Sign out? You can sign in again anytime.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AuthService.signOut();
+              loadProfile();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to sign out.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const getTimeSinceCreation = () => {
     if (!profile?.createdAt) return 'Unknown';
 
@@ -137,6 +217,8 @@ export default function ProfileScreen({navigation}: Props) {
     return Math.max(0, daysRemaining);
   };
 
+  const isGoogleUser = profile?.authProvider === 'google';
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
@@ -147,10 +229,42 @@ export default function ProfileScreen({navigation}: Props) {
 
         {/* Avatar Section */}
         <View style={styles.avatarContainer}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>✈️</Text>
-          </View>
+          {isGoogleUser && profile?.googlePhotoUrl ? (
+            <Image
+              source={{uri: profile.googlePhotoUrl}}
+              style={styles.avatarImage}
+            />
+          ) : (
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>✈️</Text>
+            </View>
+          )}
+          {isGoogleUser && profile?.googleEmail && (
+            <Text style={styles.emailText}>{profile.googleEmail}</Text>
+          )}
         </View>
+
+        {/* Google Sign-In Section (for anonymous users) */}
+        {!isGoogleUser && (
+          <View style={styles.signInSection}>
+            <TouchableOpacity
+              style={[styles.googleButton, isSigningIn && styles.googleButtonDisabled]}
+              onPress={handleGoogleSignIn}
+              disabled={isSigningIn}>
+              {isSigningIn ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Text style={styles.googleButtonIcon}>G</Text>
+                  <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.signInHint}>
+              Save your progress across devices
+            </Text>
+          </View>
+        )}
 
         {/* Nickname Section */}
         <View style={styles.section}>
@@ -209,6 +323,18 @@ export default function ProfileScreen({navigation}: Props) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Information</Text>
           <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Account Type:</Text>
+            <Text style={[styles.infoValue, isGoogleUser && styles.googleBadge]}>
+              {isGoogleUser ? 'Google' : 'Guest'}
+            </Text>
+          </View>
+          {isGoogleUser && profile?.googleDisplayName && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Google Name:</Text>
+              <Text style={styles.infoValue}>{profile.googleDisplayName}</Text>
+            </View>
+          )}
+          <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Account Created:</Text>
             <Text style={styles.infoValue}>{getTimeSinceCreation()}</Text>
           </View>
@@ -242,7 +368,7 @@ export default function ProfileScreen({navigation}: Props) {
           <TouchableOpacity
             style={styles.refreshButton}
             onPress={loadStatistics}>
-            <Text style={styles.refreshButtonText}>🔄 Refresh Statistics</Text>
+            <Text style={styles.refreshButtonText}>Refresh Statistics</Text>
           </TouchableOpacity>
         </View>
 
@@ -252,40 +378,54 @@ export default function ProfileScreen({navigation}: Props) {
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('Achievements')}>
-            <Text style={styles.actionButtonIcon}>🏅</Text>
             <Text style={styles.actionButtonText}>Achievements</Text>
-            <Text style={styles.actionButtonArrow}>›</Text>
+            <Text style={styles.actionButtonArrow}>></Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('Skins')}>
-            <Text style={styles.actionButtonIcon}>🎨</Text>
             <Text style={styles.actionButtonText}>Customize Skins</Text>
-            <Text style={styles.actionButtonArrow}>›</Text>
+            <Text style={styles.actionButtonArrow}>></Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('Leaderboard')}>
-            <Text style={styles.actionButtonIcon}>🏆</Text>
             <Text style={styles.actionButtonText}>View Leaderboard</Text>
-            <Text style={styles.actionButtonArrow}>›</Text>
+            <Text style={styles.actionButtonArrow}>></Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation.navigate('GameHistory')}>
-            <Text style={styles.actionButtonIcon}>📜</Text>
             <Text style={styles.actionButtonText}>Game History</Text>
-            <Text style={styles.actionButtonArrow}>›</Text>
+            <Text style={styles.actionButtonArrow}>></Text>
           </TouchableOpacity>
         </View>
+
+        {/* Sign Out Button (only for Google users) */}
+        {isGoogleUser && (
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}>
+            <Text style={styles.signOutButtonText}>Sign Out</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Back Button */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>← Back to Menu</Text>
+          <Text style={styles.backButtonText}>Back to Menu</Text>
         </TouchableOpacity>
       </ScrollView>
+      {AdService.shouldShowBannerAd() && (
+        <View style={styles.bannerContainer}>
+          <BannerAd
+            unitId={AD_UNIT_IDS.BANNER_PROFILE}
+            size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+            requestOptions={{requestNonPersonalizedAdsOnly: true}}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -324,8 +464,61 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: '#4CAF50',
   },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#4CAF50',
+  },
   avatarText: {
     fontSize: 48,
+  },
+  emailText: {
+    fontSize: 14,
+    color: '#aaa',
+    marginTop: 8,
+  },
+  signInSection: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4285F4',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    width: '100%',
+    maxWidth: 300,
+  },
+  googleButtonDisabled: {
+    opacity: 0.7,
+  },
+  googleButtonIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4285F4',
+    marginRight: 12,
+    backgroundColor: '#fff',
+    width: 28,
+    height: 28,
+    textAlign: 'center',
+    lineHeight: 28,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  signInHint: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 8,
   },
   section: {
     backgroundColor: '#16213e',
@@ -412,6 +605,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  googleBadge: {
+    color: '#4285F4',
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -462,10 +658,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
   },
-  actionButtonIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
   actionButtonText: {
     flex: 1,
     fontSize: 16,
@@ -475,6 +667,18 @@ const styles = StyleSheet.create({
   actionButtonArrow: {
     fontSize: 24,
     color: '#4CAF50',
+  },
+  signOutButton: {
+    backgroundColor: '#D32F2F',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  signOutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   backButton: {
     backgroundColor: '#607D8B',
@@ -487,5 +691,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  bannerContainer: {
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
   },
 });

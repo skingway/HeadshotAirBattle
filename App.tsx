@@ -22,6 +22,7 @@ import OnlineModeScreen from './src/screens/OnlineModeScreen';
 import MatchmakingScreen from './src/screens/MatchmakingScreen';
 import RoomLobbyScreen from './src/screens/RoomLobbyScreen';
 import OnlineGameScreen from './src/screens/OnlineGameScreen';
+import StoreScreen from './src/screens/StoreScreen';
 
 // Firebase Services
 import FirebaseService from './src/services/FirebaseService';
@@ -29,6 +30,9 @@ import AuthService from './src/services/AuthService';
 import StatisticsService from './src/services/StatisticsService';
 import SkinService from './src/services/SkinService';
 import {AchievementService} from './src/services/AchievementService';
+import {configureGoogleSignIn} from './src/config/GoogleSignInConfig';
+import IAPService from './src/services/IAPService';
+import AdService from './src/services/AdService';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -45,6 +49,7 @@ type RootStackParamList = {
   Matchmaking: {mode: string};
   RoomLobby: {gameId: string; roomCode?: string};
   OnlineGame: {gameId: string};
+  Store: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,6 +64,8 @@ function App(): React.JSX.Element {
     // Cleanup on unmount
     return () => {
       AuthService.cleanup();
+      IAPService.cleanup();
+      AdService.cleanup();
     };
   }, []);
 
@@ -73,10 +80,18 @@ function App(): React.JSX.Element {
       // Try to initialize Firebase
       try {
         await FirebaseService.initialize();
-        console.log('[App] ✓ Firebase connected');
+        console.log('[App] Firebase connected');
       } catch (firebaseError) {
-        console.warn('[App] ⚠️ Firebase unavailable, running in OFFLINE MODE');
+        console.warn('[App] Firebase unavailable, running in OFFLINE MODE');
         console.warn('[App] Firebase error:', firebaseError);
+      }
+
+      // Configure Google Sign-In
+      try {
+        configureGoogleSignIn();
+        console.log('[App] Google Sign-In configured');
+      } catch (googleError) {
+        console.warn('[App] Google Sign-In configuration failed:', googleError);
       }
 
       // Initialize Auth (supports offline mode)
@@ -104,10 +119,23 @@ function App(): React.JSX.Element {
       try {
         await AchievementService.initialize();
       } catch (achievementError) {
-        console.warn('[App] ⚠️ Achievement service initialization failed, using defaults');
+        console.warn('[App] Achievement service initialization failed, using defaults');
       }
 
-      console.log('[App] ✅ Application initialized successfully');
+      // Initialize IAP Service
+      try {
+        await IAPService.initialize();
+        console.log('[App] IAP service initialized');
+      } catch (iapError) {
+        console.warn('[App] IAP service initialization failed:', iapError);
+      }
+
+      // Initialize Ad Service (non-blocking)
+      AdService.initialize().catch(adError => {
+        console.warn('[App] Ad service initialization failed:', adError);
+      });
+
+      console.log('[App] Application initialized successfully');
       setIsInitializing(false);
     } catch (error) {
       console.error('[App] ❌ Critical initialization error:', error);
@@ -152,6 +180,7 @@ function App(): React.JSX.Element {
         <Stack.Screen name="Matchmaking" component={MatchmakingScreen} />
         <Stack.Screen name="RoomLobby" component={RoomLobbyScreen} />
         <Stack.Screen name="OnlineGame" component={OnlineGameScreen} />
+        <Stack.Screen name="Store" component={StoreScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

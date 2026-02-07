@@ -24,6 +24,7 @@ import DualBoardView from '../components/DualBoardView';
 import StatisticsService from '../services/StatisticsService';
 import AuthService from '../services/AuthService';
 import {AchievementService} from '../services/AchievementService';
+import AdService from '../services/AdService';
 import {useOrientation} from '../hooks/useOrientation';
 
 type RootStackParamList = {
@@ -166,6 +167,7 @@ export default function GameScreen({navigation, route}: Props) {
             setPhase('gameover');
             addLog('🏳️ You surrendered!');
             AudioManager.playSFX('defeat');
+            showGameOverAd();
 
             // Update statistics - record as loss
             console.log('[GameScreen] Player surrendered! Updating statistics...');
@@ -229,6 +231,14 @@ export default function GameScreen({navigation, route}: Props) {
 
   const addLog = (message: string) => {
     setGameLog(prev => [...prev, message].slice(-10)); // Keep last 10 messages
+  };
+
+  // Show interstitial ad after game ends (with delay)
+  const showGameOverAd = () => {
+    AdService.incrementGameCount();
+    setTimeout(async () => {
+      await AdService.showInterstitialIfReady();
+    }, 1500);
   };
 
   // Check achievements after game ends
@@ -393,6 +403,7 @@ export default function GameScreen({navigation, route}: Props) {
       setPhase('gameover');
       addLog('🎉 YOU WIN! All enemy planes destroyed!');
       AudioManager.playSFX('victory');
+      showGameOverAd();
 
       // Update statistics
       console.log('[GameScreen] Player won! Updating statistics...');
@@ -491,6 +502,7 @@ export default function GameScreen({navigation, route}: Props) {
       setPhase('gameover');
       addLog('🎉 YOU WIN! All enemy planes destroyed!');
       AudioManager.playSFX('victory');
+      showGameOverAd();
 
       // Update statistics
       console.log('[GameScreen] Player won! Updating statistics...');
@@ -591,6 +603,7 @@ export default function GameScreen({navigation, route}: Props) {
       setPhase('gameover');
       addLog('💀 GAME OVER! AI destroyed all your planes!');
       AudioManager.playSFX('defeat');
+      showGameOverAd();
 
       // Update statistics
       console.log('[GameScreen] AI won! Updating statistics...');
