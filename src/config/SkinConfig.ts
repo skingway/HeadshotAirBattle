@@ -399,20 +399,30 @@ export const getThemeById = (id: string): BoardTheme | undefined => {
   return BOARD_THEMES.find(theme => theme.id === id);
 };
 
-export const getUnlockedSkins = (totalGames: number): AirplaneSkin[] => {
-  return AIRPLANE_SKINS.filter(skin => totalGames >= skin.unlockRequirement);
+export const getUnlockedSkins = (totalGames: number, hasPremiumSkins: boolean = false): AirplaneSkin[] => {
+  return AIRPLANE_SKINS.filter(skin => {
+    if (skin.isPremium) return hasPremiumSkins;
+    return totalGames >= skin.unlockRequirement;
+  });
 };
 
-export const getUnlockedThemes = (totalWins: number): BoardTheme[] => {
-  return BOARD_THEMES.filter(theme => totalWins >= theme.unlockRequirement);
+export const getUnlockedThemes = (totalWins: number, hasPremiumThemes: boolean = false): BoardTheme[] => {
+  return BOARD_THEMES.filter(theme => {
+    if (theme.isPremium) return hasPremiumThemes;
+    return totalWins >= theme.unlockRequirement;
+  });
 };
 
-export const isSkinUnlocked = (skinId: string, totalGames: number): boolean => {
+export const isSkinUnlocked = (skinId: string, totalGames: number, hasPremiumSkins: boolean = false): boolean => {
   const skin = getSkinById(skinId);
-  return skin ? totalGames >= skin.unlockRequirement : false;
+  if (!skin) return false;
+  if (skin.isPremium) return hasPremiumSkins;
+  return totalGames >= skin.unlockRequirement;
 };
 
-export const isThemeUnlocked = (themeId: string, totalWins: number): boolean => {
+export const isThemeUnlocked = (themeId: string, totalWins: number, hasPremiumThemes: boolean = false): boolean => {
   const theme = getThemeById(themeId);
-  return theme ? totalWins >= theme.unlockRequirement : false;
+  if (!theme) return false;
+  if (theme.isPremium) return hasPremiumThemes;
+  return totalWins >= theme.unlockRequirement;
 };

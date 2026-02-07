@@ -130,12 +130,15 @@ export default function GameScreen({navigation, route}: Props) {
     setPhase('battle');
     addLog("Battle started! It's your turn!");
     addLog("Tap on enemy board to attack.");
+    // Start background music for battle
+    AudioManager.playBGM();
     // Start timer for first turn
     startTurnTimer();
   };
 
   const resetGame = () => {
     stopTurnTimer();
+    AudioManager.stopBGM();
     setPhase('deployment');
     setPlayerBoard(null);
     setAiBoard(null);
@@ -163,6 +166,7 @@ export default function GameScreen({navigation, route}: Props) {
           style: 'destructive',
           onPress: () => {
             stopTurnTimer();
+            AudioManager.stopBGM();
             setWinner('AI');
             setPhase('gameover');
             addLog('🏳️ You surrendered!');
@@ -402,6 +406,7 @@ export default function GameScreen({navigation, route}: Props) {
       setWinner('Player');
       setPhase('gameover');
       addLog('🎉 YOU WIN! All enemy planes destroyed!');
+      AudioManager.stopBGM();
       AudioManager.playSFX('victory');
       showGameOverAd();
 
@@ -501,6 +506,7 @@ export default function GameScreen({navigation, route}: Props) {
       setWinner('Player');
       setPhase('gameover');
       addLog('🎉 YOU WIN! All enemy planes destroyed!');
+      AudioManager.stopBGM();
       AudioManager.playSFX('victory');
       showGameOverAd();
 
@@ -602,6 +608,7 @@ export default function GameScreen({navigation, route}: Props) {
       setWinner('AI');
       setPhase('gameover');
       addLog('💀 GAME OVER! AI destroyed all your planes!');
+      AudioManager.stopBGM();
       AudioManager.playSFX('defeat');
       showGameOverAd();
 

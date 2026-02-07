@@ -22,6 +22,7 @@ import {
 } from '../config/SkinConfig';
 import SkinService from '../services/SkinService';
 import StatisticsService from '../services/StatisticsService';
+import IAPService from '../services/IAPService';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -49,14 +50,31 @@ export default function SkinsScreen({navigation}: Props) {
     setTotalWins(stats.wins);
   };
 
+  const getSkinLockHint = (skin: AirplaneSkin): string => {
+    if (skin.isPremium) {
+      return 'Get Premium Skin Pack';
+    }
+    const gamesNeeded = skin.unlockRequirement - totalGames;
+    return `Need ${gamesNeeded} more game${gamesNeeded > 1 ? 's' : ''} or Premium Skin Pack`;
+  };
+
+  const getThemeLockHint = (theme: BoardTheme): string => {
+    if (theme.isPremium) {
+      return 'Get Premium Theme Pack';
+    }
+    const winsNeeded = theme.unlockRequirement - totalWins;
+    return `Need ${winsNeeded} more win${winsNeeded > 1 ? 's' : ''} or Premium Theme Pack`;
+  };
+
   const handleSelectSkin = async (skin: AirplaneSkin) => {
-    // Check if unlocked
-    if (totalGames < skin.unlockRequirement) {
-      Alert.alert(
-        'Locked',
-        `${skin.name} is locked. ${skin.unlockText} to unlock.`,
-        [{text: 'OK'}]
-      );
+    // Check if premium skin requires purchase
+    if (skin.isPremium && !IAPService.hasPremiumSkins()) {
+      Alert.alert('Locked', getSkinLockHint(skin), [{text: 'OK'}]);
+      return;
+    }
+    // Check if unlocked by game count (or by purchasing skin pack)
+    if (!skin.isPremium && totalGames < skin.unlockRequirement && !IAPService.areAllEarnableSkinsUnlocked()) {
+      Alert.alert('Locked', getSkinLockHint(skin), [{text: 'OK'}]);
       return;
     }
 
@@ -68,13 +86,14 @@ export default function SkinsScreen({navigation}: Props) {
   };
 
   const handleSelectTheme = async (theme: BoardTheme) => {
-    // Check if unlocked
-    if (totalWins < theme.unlockRequirement) {
-      Alert.alert(
-        'Locked',
-        `${theme.name} is locked. ${theme.unlockText} to unlock.`,
-        [{text: 'OK'}]
-      );
+    // Check if premium theme requires purchase
+    if (theme.isPremium && !IAPService.hasPremiumThemes()) {
+      Alert.alert('Locked', getThemeLockHint(theme), [{text: 'OK'}]);
+      return;
+    }
+    // Check if unlocked by win count (or by purchasing theme pack)
+    if (!theme.isPremium && totalWins < theme.unlockRequirement && !IAPService.areAllEarnableThemesUnlocked()) {
+      Alert.alert('Locked', getThemeLockHint(theme), [{text: 'OK'}]);
       return;
     }
 
@@ -86,7 +105,9 @@ export default function SkinsScreen({navigation}: Props) {
   };
 
   const renderAirplaneSkin = (skin: AirplaneSkin) => {
-    const isLocked = totalGames < skin.unlockRequirement;
+    const isLocked = skin.isPremium
+      ? !IAPService.hasPremiumSkins()
+      : totalGames < skin.unlockRequirement && !IAPService.areAllEarnableSkinsUnlocked();
     const isSelected = skin.id === currentSkin;
 
     return (
@@ -97,22 +118,23 @@ export default function SkinsScreen({navigation}: Props) {
           isSelected && styles.skinCardSelected,
           isLocked && styles.skinCardLocked,
         ]}
-        onPress={() => handleSelectSkin(skin)}
-        disabled={isLocked && !isSelected}>
+        onPress={() => handleSelectSkin(skin)}>
         <View style={[styles.skinPreview, {backgroundColor: skin.color}]}>
           {isSelected && <Text style={styles.selectedIcon}>✓</Text>}
           {isLocked && <Text style={styles.lockIcon}>🔒</Text>}
         </View>
         <Text style={[styles.skinName, isLocked && styles.lockedText]}>{skin.name}</Text>
         <Text style={[styles.skinUnlock, isLocked && styles.lockedText]}>
-          {isLocked ? skin.unlockText : '✓ Unlocked'}
+          {isLocked ? getSkinLockHint(skin) : '✓ Unlocked'}
         </Text>
       </TouchableOpacity>
     );
   };
 
   const renderBoardTheme = (theme: BoardTheme) => {
-    const isLocked = totalWins < theme.unlockRequirement;
+    const isLocked = theme.isPremium
+      ? !IAPService.hasPremiumThemes()
+      : totalWins < theme.unlockRequirement && !IAPService.areAllEarnableThemesUnlocked();
     const isSelected = theme.id === currentTheme;
 
     return (
@@ -123,8 +145,7 @@ export default function SkinsScreen({navigation}: Props) {
           isSelected && styles.themeCardSelected,
           isLocked && styles.themeCardLocked,
         ]}
-        onPress={() => handleSelectTheme(theme)}
-        disabled={isLocked && !isSelected}>
+        onPress={() => handleSelectTheme(theme)}>
         <View style={styles.themePreview}>
           <Text style={styles.themeIcon}>{theme.icon}</Text>
           {isSelected && <View style={styles.selectedBadge}><Text style={styles.selectedBadgeText}>ACTIVE</Text></View>}
@@ -137,7 +158,7 @@ export default function SkinsScreen({navigation}: Props) {
         </View>
         <Text style={[styles.themeName, isLocked && styles.lockedText]}>{theme.name}</Text>
         <Text style={[styles.themeUnlock, isLocked && styles.lockedText]}>
-          {isLocked ? theme.unlockText : '✓ Unlocked'}
+          {isLocked ? getThemeLockHint(theme) : '✓ Unlocked'}
         </Text>
       </TouchableOpacity>
     );

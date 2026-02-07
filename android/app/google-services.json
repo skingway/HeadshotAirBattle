@@ -13,7 +13,20 @@
           "package_name": "com.headshotairbattle"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "262233081033-10m2rr9gh1ptt6l2p36e02kj02ra8krn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.headshotairbattle",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "262233081033-blhdfeq6bf3s614oa5r6fou47p0irct3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBaEwwZ7rk67JY59qzkv_FXR6VOrO8AWYE"
@@ -21,7 +34,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "262233081033-blhdfeq6bf3s614oa5r6fou47p0irct3.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "262233081033-855lor161udtaeid1sbiq203rqaoidln.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.headshotairbattle"
+              }
+            }
+          ]
         }
       }
     }

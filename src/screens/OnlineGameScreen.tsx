@@ -31,6 +31,7 @@ import AuthService from '../services/AuthService';
 import StatisticsService from '../services/StatisticsService';
 
 type RootStackParamList = {
+  MainMenu: undefined;
   OnlineMode: undefined;
   OnlineGame: {gameId: string};
 };
@@ -197,6 +198,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       const userId = AuthService.getUserId();
       const didWin = state.winner === userId;
 
+      AudioManager.stopBGM();
       if (didWin) {
         addLog('🎉 YOU WIN!');
         AudioManager.playSFX('victory');
@@ -213,7 +215,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       // Save game history
       const playerBoard = playerBoardRef.current;
       const opponentBoard = opponentBoardRef.current;
-      if (gameState && playerBoard && opponentBoard) {
+      if (state && playerBoard && opponentBoard) {
         const historyData = {
           gameType: 'online' as const,
           opponent: opponent?.nickname || 'Unknown',
@@ -334,6 +336,8 @@ export default function OnlineGameScreen({navigation, route}: Props) {
   const handleCountdownComplete = () => {
     transitionToPhase('battle', 'countdown complete');
     addLog('Battle started!');
+    // Start background music for battle
+    AudioManager.playBGM();
   };
 
   const handleCellPress = async (row: number, col: number) => {
