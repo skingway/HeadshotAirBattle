@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import AudioManager from '../services/AudioManager';
@@ -225,16 +226,18 @@ export default function SettingsScreen({navigation}: Props) {
           <Text style={styles.sectionTitle}>About</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>App Name:</Text>
-            <Text style={styles.infoValue}>Airplane Battle</Text>
+            <Text style={styles.infoValue}>Headshot Air Battle</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Version:</Text>
-            <Text style={styles.infoValue}>v0.5.0 RN</Text>
+            <Text style={styles.infoValue}>v1.0</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Platform:</Text>
-            <Text style={styles.infoValue}>React Native</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => Linking.openURL('https://airplane-battle-7a3fd.web.app/privacy-policy.html')}>
+            <Text style={styles.infoLabel}>Privacy Policy</Text>
+            <Text style={styles.linkText}>View &gt;</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Back Button */}
@@ -317,6 +320,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
+  },
+  linkRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginTop: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#2a3a5e',
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#4a90e2',
+    fontWeight: 'bold',
   },
   infoLabel: {
     fontSize: 14,
