@@ -187,11 +187,7 @@ export default function SettingsScreen({navigation}: Props) {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.testButton}
-            onPress={() => AudioManager.playSFX('hit')}>
-            <Text style={styles.testButtonText}>Test Sound</Text>
-          </TouchableOpacity>
+
         </View>
 
         {/* Account Section */}
@@ -316,18 +312,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 15,
     minWidth: 50,
     textAlign: 'center',
-  },
-  testButton: {
-    backgroundColor: '#FF9800',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  testButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   infoRow: {
     flexDirection: 'row',
