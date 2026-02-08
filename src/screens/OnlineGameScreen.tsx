@@ -29,6 +29,7 @@ import database from '@react-native-firebase/database';
 import MultiplayerService, {GameState} from '../services/MultiplayerService';
 import AuthService from '../services/AuthService';
 import StatisticsService from '../services/StatisticsService';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -183,6 +184,9 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       if (phaseRef.current !== 'battle') {
         transitionToPhase('battle', 'Firebase status is battle');
         addLog('Battle started!');
+        // Start BGM when entering battle phase from Firebase state change
+        // (may be skipped if countdown was bypassed)
+        AudioManager.playBGM();
       }
 
       // Update turn indicator
@@ -216,14 +220,24 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       const playerBoard = playerBoardRef.current;
       const opponentBoard = opponentBoardRef.current;
       if (state && playerBoard && opponentBoard) {
+        // Count attacks from Firebase state (handles push-key format from RTDB)
+        const myAttacks = myPlayer?.attacks;
+        let attackCount = 0;
+        if (Array.isArray(myAttacks)) {
+          attackCount = myAttacks.length;
+        } else if (myAttacks && typeof myAttacks === 'object') {
+          attackCount = Object.keys(myAttacks).length;
+        }
+
         const historyData = {
           gameType: 'online' as const,
           opponent: opponent?.nickname || 'Unknown',
           winner: state.winner || '',
           boardSize: state.boardSize,
           airplaneCount: state.airplaneCount,
-          totalTurns: myPlayer?.attacks.length || 0,
+          totalTurns: attackCount,
           completedAt: Date.now(),
+          // Use same field names as AI mode for BattleReportScreen compatibility
           playerBoardData: {
             airplanes: playerBoard.airplanes.map(a => ({
               id: a.id,
@@ -233,11 +247,19 @@ export default function OnlineGameScreen({navigation, route}: Props) {
             })),
             attacks: playerBoard.getAttackHistory(),
           },
-          opponentBoardData: {
+          // Use aiBoardData key so BattleReportScreen can render opponent board
+          aiBoardData: {
+            airplanes: opponentBoard.airplanes.map(a => ({
+              id: a.id,
+              headRow: a.headRow,
+              headCol: a.headCol,
+              direction: a.direction,
+            })),
             attacks: opponentBoard.getAttackHistory(),
           },
+          // Use same field names as AI mode for BattleReportScreen compatibility
           playerStats: myPlayer?.stats || {hits: 0, misses: 0, kills: 0},
-          opponentStats: opponent?.stats || {hits: 0, misses: 0, kills: 0},
+          aiStats: opponent?.stats || {hits: 0, misses: 0, kills: 0},
         };
 
         StatisticsService.saveGameHistory(historyData).then(success => {
@@ -279,15 +301,26 @@ export default function OnlineGameScreen({navigation, route}: Props) {
     setRenderKey(prev => prev + 1); // Force render
   };
 
-  const syncOpponentAttacks = (attacks: Array<{row: number; col: number; result: string; timestamp: number}>) => {
+  const syncOpponentAttacks = (attacks: any) => {
     const playerBoard = playerBoardRef.current;
-    if (!playerBoard) return;
+    if (!playerBoard || !attacks) return;
+
+    // Firebase RTDB push() converts arrays to objects with push keys.
+    // Normalize to array format.
+    let attackList: Array<{row: number; col: number; result: string; timestamp: number}>;
+    if (Array.isArray(attacks)) {
+      attackList = attacks;
+    } else if (typeof attacks === 'object') {
+      attackList = Object.values(attacks);
+    } else {
+      return;
+    }
 
     let hasNewAttacks = false;
 
     // Apply all opponent attacks to our board
-    attacks.forEach(attack => {
-      if (!playerBoard.isCellAttacked(attack.row, attack.col)) {
+    attackList.forEach(attack => {
+      if (attack && !playerBoard.isCellAttacked(attack.row, attack.col)) {
         playerBoard.processAttack(attack.row, attack.col);
         hasNewAttacks = true;
       }
@@ -446,7 +479,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
       <SafeAreaView style={styles.container}>
         <View style={styles.waitingContainer}>
           <Text style={styles.waitingTitle}>Waiting for Opponent</Text>
-          <ActivityIndicator size="large" color="#4CAF50" style={styles.waitingSpinner} />
+          <ActivityIndicator size="large" color={colors.accent} style={styles.waitingSpinner} />
           <Text style={styles.waitingText}>
             {opponent?.nickname || 'Opponent'} is deploying airplanes...
           </Text>
@@ -563,7 +596,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
             <Text style={styles.menuButtonText}>Back to Online Menu</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.menuButton, {backgroundColor: '#607D8B', marginTop: 16}]}
+            style={[styles.menuButton, styles.menuButtonSecondary]}
             onPress={async () => {
               await MultiplayerService.leaveGame();
               // Navigate back to main menu
@@ -583,28 +616,33 @@ export default function OnlineGameScreen({navigation, route}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   header: {
     padding: 15,
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 18,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
   opponent: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 14,
-    color: '#4CAF50',
+    color: colors.accent,
     marginTop: 5,
   },
   turnIndicator: {
-    fontSize: 16,
-    color: '#FFD700',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 14,
+    color: colors.gold,
     marginTop: 10,
-    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   statsRow: {
     flexDirection: 'row',
@@ -614,20 +652,23 @@ const styles = StyleSheet.create({
   },
   statBox: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 212, 255, 0.06)',
     padding: 8,
-    borderRadius: 5,
+    borderRadius: 8,
     minWidth: 90,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.12)',
   },
   statLabel: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 10,
-    color: '#aaa',
+    color: colors.textMuted,
     marginBottom: 3,
   },
   statValue: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 13,
+    color: colors.accent,
   },
   contentScroll: {
     flex: 1,
@@ -640,32 +681,36 @@ const styles = StyleSheet.create({
     minHeight: 500,
   },
   logContainer: {
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
     padding: 10,
     margin: 10,
-    borderRadius: 10,
+    borderRadius: 12,
     maxHeight: 120,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   logScroll: {
     maxHeight: 80,
   },
   logTitle: {
-    fontSize: 16,
-    color: '#FFD700',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.gold,
     marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   logText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 13,
-    color: '#e0e0e0',
-    marginBottom: 8,
+    color: colors.textSecondary,
+    marginBottom: 6,
     paddingVertical: 4,
     paddingHorizontal: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: 4,
     borderLeftWidth: 3,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: colors.accent,
   },
   waitingContainer: {
     flex: 1,
@@ -674,31 +719,36 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   waitingTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 20,
+    color: colors.textPrimary,
     marginBottom: 30,
+    letterSpacing: 2,
   },
   waitingSpinner: {
     marginVertical: 20,
   },
   waitingText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 16,
-    color: '#aaa',
+    color: colors.textMuted,
     textAlign: 'center',
     marginBottom: 40,
   },
   leaveButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     minWidth: 200,
     alignItems: 'center',
   },
   leaveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.danger,
+    fontSize: 13,
+    letterSpacing: 1,
   },
   gameoverContainer: {
     flex: 1,
@@ -707,43 +757,53 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   gameoverText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 26,
+    color: colors.textPrimary,
     marginBottom: 10,
+    letterSpacing: 2,
   },
   gameoverSubtext: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 16,
-    color: '#aaa',
+    color: colors.textMuted,
     marginBottom: 30,
     textAlign: 'center',
   },
   menuButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.accent,
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     minWidth: 200,
     alignItems: 'center',
   },
+  menuButtonSecondary: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 16,
+  },
   menuButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textPrimary,
+    fontSize: 14,
+    letterSpacing: 2,
   },
   surrenderButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: colors.dangerDim,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     marginHorizontal: 10,
     marginTop: 20,
     marginBottom: 30,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#D32F2F',
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
   },
   surrenderButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.danger,
+    fontSize: 13,
+    letterSpacing: 1,
   },
 });

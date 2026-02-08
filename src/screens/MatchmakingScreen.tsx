@@ -17,6 +17,7 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RouteProp} from '@react-navigation/native';
 import MatchmakingService from '../services/MatchmakingService';
 import MultiplayerService from '../services/MultiplayerService';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   OnlineMode: undefined;
@@ -228,7 +229,7 @@ export default function MatchmakingScreen({navigation, route}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   content: {
     flex: 1,
@@ -243,7 +244,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    backgroundColor: 'rgba(0, 212, 255, 0.05)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -251,45 +252,50 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    backgroundColor: 'rgba(0, 212, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#4CAF50',
+    borderColor: colors.accent,
   },
   icon: {
     fontSize: 60,
   },
   status: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 18,
+    color: colors.textPrimary,
     marginBottom: 16,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   timer: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronExtraBold,
+    fontSize: 42,
+    color: colors.accent,
     marginBottom: 32,
   },
   infoBox: {
-    backgroundColor: '#16213e',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 14,
     padding: 20,
     marginBottom: 24,
     alignItems: 'center',
     width: '100%',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   infoText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 8,
     textAlign: 'center',
   },
   infoSubtext: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
     textAlign: 'center',
   },
   queueInfo: {
@@ -301,24 +307,28 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.accent,
     marginRight: 8,
   },
   queueText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
   },
   cancelButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
     paddingVertical: 16,
     paddingHorizontal: 48,
-    borderRadius: 10,
+    borderRadius: 12,
     minWidth: 200,
     alignItems: 'center',
   },
   cancelButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.danger,
+    fontSize: 14,
+    letterSpacing: 2,
   },
 });

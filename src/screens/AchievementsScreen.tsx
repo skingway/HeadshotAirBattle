@@ -5,10 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  SafeAreaView,
   Dimensions,
 } from 'react-native';
 import {AchievementService} from '../services/AchievementService';
 import {AchievementConfig, Achievement, AchievementCategory} from '../config/AchievementConfig';
+import {colors, fonts} from '../theme/colors';
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
@@ -42,7 +44,7 @@ export default function AchievementsScreen({navigation}: Props) {
   ];
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -50,7 +52,7 @@ export default function AchievementsScreen({navigation}: Props) {
           onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Achievements</Text>
+        <Text style={styles.headerTitle}>ACHIEVEMENTS</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -166,23 +168,22 @@ export default function AchievementsScreen({navigation}: Props) {
           );
         })}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.bgPrimary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: '#2c2c2c',
-    borderBottomWidth: 1,
-    borderBottomColor: '#3a3a3a',
+    borderBottomWidth: 2,
+    borderBottomColor: colors.accentBorder,
   },
   backButton: {
     paddingVertical: 8,
@@ -190,20 +191,21 @@ const styles = StyleSheet.create({
     minWidth: 70,
   },
   backButtonText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#3498db',
-    fontWeight: '600',
+    color: colors.accent,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 18,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
   progressContainer: {
     padding: 20,
-    backgroundColor: '#2c2c2c',
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
     borderBottomWidth: 1,
-    borderBottomColor: '#3a3a3a',
+    borderBottomColor: colors.divider,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -211,51 +213,53 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   progressText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#bbb',
-    fontWeight: '600',
+    color: colors.textSecondary,
   },
   progressPercentage: {
+    fontFamily: fonts.orbitronBold,
     fontSize: 16,
-    color: '#3498db',
-    fontWeight: 'bold',
+    color: colors.accent,
   },
   progressBarContainer: {
-    height: 8,
-    backgroundColor: '#3a3a3a',
-    borderRadius: 4,
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#3498db',
-    borderRadius: 4,
+    backgroundColor: colors.accent,
+    borderRadius: 3,
   },
   categoryTabs: {
     flexDirection: 'row',
-    backgroundColor: '#2c2c2c',
     paddingHorizontal: 10,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    gap: 6,
   },
   categoryTab: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginHorizontal: 5,
-    borderRadius: 8,
-    backgroundColor: '#3a3a3a',
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   categoryTabActive: {
-    backgroundColor: '#3498db',
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accentBorder,
   },
   categoryTabText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 14,
-    color: '#aaa',
-    fontWeight: '600',
+    color: colors.textMuted,
   },
   categoryTabTextActive: {
-    color: '#fff',
+    color: colors.accent,
   },
   achievementsList: {
     flex: 1,
@@ -265,24 +269,29 @@ const styles = StyleSheet.create({
   },
   achievementCard: {
     flexDirection: 'row',
-    backgroundColor: '#2c2c2c',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 30, 60, 0.3)',
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   achievementCardUnlocked: {
-    backgroundColor: '#2c3e50',
+    backgroundColor: 'rgba(0, 212, 255, 0.05)',
+    borderColor: 'rgba(0, 212, 255, 0.12)',
   },
   achievementIcon: {
-    width: 60,
-    height: 60,
+    width: 56,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 14,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 28,
   },
   achievementIconText: {
-    fontSize: 40,
+    fontSize: 32,
   },
   achievementIconLocked: {
     opacity: 0.3,
@@ -294,57 +303,63 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   achievementName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.textPrimary,
     flex: 1,
+    letterSpacing: 0.5,
   },
   achievementNameLocked: {
-    color: '#666',
+    color: colors.textDark,
   },
   rarityBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingVertical: 3,
+    borderRadius: 10,
     marginLeft: 8,
   },
   rarityText: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 8,
+    color: colors.bgPrimary,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   achievementDescription: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#bbb',
-    marginBottom: 8,
+    color: colors.textMuted,
+    marginBottom: 6,
+    lineHeight: 20,
   },
   achievementDescriptionLocked: {
-    color: '#666',
+    color: colors.textDark,
   },
   rewardContainer: {
     flexDirection: 'row',
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#3a3a3a',
+    borderTopColor: colors.divider,
   },
   rewardLabel: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 12,
-    color: '#888',
+    color: colors.textMuted,
     marginRight: 8,
   },
   rewardValue: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 12,
-    color: '#f39c12',
-    fontWeight: '600',
+    color: colors.gold,
   },
   lockedHint: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 12,
-    color: '#888',
+    color: colors.textDark,
     fontStyle: 'italic',
     marginTop: 4,
   },

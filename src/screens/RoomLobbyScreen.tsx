@@ -18,6 +18,7 @@ import {
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RouteProp} from '@react-navigation/native';
 import MultiplayerService, {GameState} from '../services/MultiplayerService';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   OnlineMode: undefined;
@@ -51,23 +52,44 @@ export default function RoomLobbyScreen({navigation, route}: Props) {
     };
   }, []);
 
+  const hasNavigatedRef = React.useRef(false);
+
   const handleStateChange = (state: GameState) => {
     setGameState(state);
 
-    // Check if both players are ready
-    if (state.status === 'deploying' && state.player1?.ready && state.player2?.ready) {
-      // Both players ready, start deployment
-      navigation.replace('OnlineGame', {gameId});
+    // Prevent processing after we've already navigated away
+    if (hasNavigatedRef.current) {
+      return;
     }
 
-    // Check if opponent disconnected
-    if (state.player1 && !state.player1.connected) {
-      Alert.alert('Opponent Disconnected', 'Player 1 has left the game');
-      handleLeave();
+    const currentGame = MultiplayerService.getCurrentGame();
+    const myRole = currentGame?.role;
+
+    // Determine which player is the opponent
+    const opponent = myRole === 'player1' ? state.player2 : state.player1;
+
+    // Check if both players are ready - navigate to deployment/game
+    if (state.player1?.ready && state.player2?.ready &&
+        (state.status === 'deploying' || state.status === 'battle')) {
+      hasNavigatedRef.current = true;
+      navigation.replace('OnlineGame', {gameId});
+      return;
     }
-    if (state.player2 && !state.player2.connected) {
-      Alert.alert('Opponent Disconnected', 'Player 2 has left the game');
-      handleLeave();
+
+    // Check if opponent disconnected (only check the OTHER player, not ourselves)
+    if (opponent && !opponent.connected) {
+      hasNavigatedRef.current = true;
+      Alert.alert(
+        'Opponent Disconnected',
+        `${opponent.nickname || 'Opponent'} has left the game`,
+        [{
+          text: 'OK',
+          onPress: async () => {
+            await MultiplayerService.leaveGame();
+            navigation.navigate('OnlineMode');
+          },
+        }]
+      );
     }
   };
 
@@ -116,7 +138,7 @@ export default function RoomLobbyScreen({navigation, route}: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>Loading game...</Text>
         </View>
       </SafeAreaView>
@@ -182,7 +204,7 @@ export default function RoomLobbyScreen({navigation, route}: Props) {
           {waitingForOpponent ? (
             <View style={styles.playerCard}>
               <View style={styles.waitingContainer}>
-                <ActivityIndicator color="#4CAF50" />
+                <ActivityIndicator color={colors.accent} />
                 <Text style={styles.waitingText}>Waiting for opponent...</Text>
               </View>
             </View>
@@ -260,7 +282,7 @@ export default function RoomLobbyScreen({navigation, route}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   scrollView: {
     flex: 1,
@@ -274,36 +296,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
+    fontFamily: fonts.rajdhaniRegular,
     marginTop: 16,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textPrimary,
   },
   header: {
     alignItems: 'center',
     marginBottom: 30,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 22,
+    color: colors.textPrimary,
     marginBottom: 16,
+    letterSpacing: 2,
   },
   roomCodeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
   },
   roomCodeLabel: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
     marginRight: 8,
   },
   roomCode: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronExtraBold,
+    fontSize: 22,
+    color: colors.accent,
     letterSpacing: 4,
   },
   shareButton: {
@@ -314,17 +341,19 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   playersContainer: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   playerCard: {
-    backgroundColor: '#16213e',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 14,
     padding: 20,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   currentPlayerCard: {
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: colors.accent,
   },
   playerHeader: {
     flexDirection: 'row',
@@ -339,97 +368,112 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   playerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 14,
+    color: colors.textPrimary,
     marginBottom: 4,
+    letterSpacing: 0.5,
   },
   playerRole: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
   },
   statusBadge: {
-    backgroundColor: '#0f3460',
+    backgroundColor: 'rgba(0, 212, 255, 0.08)',
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   statusReady: {
-    backgroundColor: '#1a4d2e',
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
+    borderColor: 'rgba(76, 175, 80, 0.3)',
   },
   statusText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textPrimary,
   },
   waitingContainer: {
     alignItems: 'center',
     paddingVertical: 20,
   },
   waitingText: {
+    fontFamily: fonts.rajdhaniRegular,
     marginTop: 12,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
   },
   vsText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#666',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 20,
+    color: colors.textDark,
     textAlign: 'center',
     marginVertical: 8,
+    letterSpacing: 2,
   },
   infoCard: {
-    backgroundColor: '#16213e',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 14,
     padding: 20,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   infoTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 14,
+    color: colors.accent,
     marginBottom: 16,
+    letterSpacing: 1,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: colors.divider,
   },
   infoLabel: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
   },
   infoValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.textPrimary,
   },
   readyButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: colors.accent,
     padding: 18,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
   readyButtonActive: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.success,
   },
   readyButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textPrimary,
+    fontSize: 14,
+    letterSpacing: 2,
   },
   leaveButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
   leaveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.danger,
+    fontSize: 13,
+    letterSpacing: 1,
   },
 });

@@ -278,8 +278,10 @@ class StatisticsService {
     completedAt: number;
     playerBoardData?: any;
     aiBoardData?: any;
+    opponentBoardData?: any;
     playerStats?: {hits: number; misses: number; kills: number};
     aiStats?: {hits: number; misses: number; kills: number};
+    opponentStats?: {hits: number; misses: number; kills: number};
   }): Promise<boolean> {
     const userId = AuthService.getUserId();
     if (!userId) {
@@ -336,7 +338,8 @@ class StatisticsService {
       if (history) {
         const historyArray = JSON.parse(history);
         // Return last 10 games (most recent first)
-        return historyArray.reverse().slice(0, 10);
+        // Use spread to avoid mutating the original array with reverse()
+        return [...historyArray].reverse().slice(0, 10);
       }
 
       // If online and no local data, try Firestore

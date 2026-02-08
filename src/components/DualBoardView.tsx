@@ -10,6 +10,7 @@ import {View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions} from '
 import BoardManager from '../core/BoardManager';
 import SkinService from '../services/SkinService';
 import {useOrientation} from '../hooks/useOrientation';
+import {colors, fonts} from '../theme/colors';
 
 interface DualBoardViewProps {
   playerBoard: BoardManager;
@@ -227,7 +228,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   boardTitleLandscape: {
-    fontSize: 14,
+    fontSize: 12,
   },
   enemyBoardContainer: {
     alignItems: 'center',
@@ -235,34 +236,36 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   boardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 14,
+    color: colors.textPrimary,
     marginBottom: 10,
+    letterSpacing: 1,
   },
   boardScrollContent: {
     paddingHorizontal: 20,
   },
   playerBoardContainer: {
-    backgroundColor: '#16213e',
-    borderRadius: 8,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 12,
     padding: 10,
     marginHorizontal: 10,
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: colors.accent,
   },
   playerBoardTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 12,
+    color: colors.accent,
     marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   playerBoardWrapper: {
     alignItems: 'center',
   },
   board: {
-    backgroundColor: '#0f3460',
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
     padding: 5,
     borderRadius: 5,
   },
@@ -276,22 +279,22 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   cellEmpty: {
-    backgroundColor: '#1a4d7a',
+    backgroundColor: 'rgba(0, 20, 40, 0.5)',
   },
   cellAirplane: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'rgba(0, 212, 255, 0.25)',
   },
   cellHit: {
-    backgroundColor: '#FF9800',
+    backgroundColor: 'rgba(255, 152, 0, 0.6)',
   },
   cellMiss: {
-    backgroundColor: '#607D8B',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   cellKilled: {
-    backgroundColor: '#F44336',
+    backgroundColor: 'rgba(255, 40, 40, 0.7)',
   },
   cellText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontWeight: 'bold',
   },
 });

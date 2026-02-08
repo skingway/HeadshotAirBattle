@@ -3,7 +3,7 @@
  * Displays IAP products and handles purchases
  */
 
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,14 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Animated,
+  Pressable,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
 import IAPService from '../services/IAPService';
 import {PRODUCT_IDS, PRODUCT_INFO} from '../config/IAPConfig';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -27,6 +30,34 @@ type RootStackParamList = {
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Store'>;
 };
+
+function AnimatedButton({
+  onPress,
+  style,
+  children,
+  disabled,
+}: {
+  onPress: () => void;
+  style: any;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  return (
+    <Pressable
+      onPressIn={() => {
+        if (!disabled) Animated.spring(scaleAnim, {toValue: 0.97, useNativeDriver: true}).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(scaleAnim, {toValue: 1, useNativeDriver: true}).start();
+      }}
+      onPress={disabled ? undefined : onPress}>
+      <Animated.View style={[style, {transform: [{scale: scaleAnim}]}]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export default function StoreScreen({navigation}: Props) {
   const [isLoading, setIsLoading] = useState(true);
@@ -39,9 +70,15 @@ export default function StoreScreen({navigation}: Props) {
     acePilotBundle: false,
     nicknameFreedom: false,
   });
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     loadData();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {toValue: 1, duration: 400, useNativeDriver: true}),
+      Animated.timing(slideAnim, {toValue: 0, duration: 400, useNativeDriver: true}),
+    ]).start();
   }, []);
 
   useFocusEffect(
@@ -82,10 +119,8 @@ export default function StoreScreen({navigation}: Props) {
 
   const handlePurchase = async (productId: string) => {
     if (IAPService.isPurchased(productId)) return;
-
     const info = PRODUCT_INFO[productId];
     const price = getPrice(productId);
-
     Alert.alert(
       'Confirm Purchase',
       `Purchase ${info?.title} for ${price}?`,
@@ -100,10 +135,7 @@ export default function StoreScreen({navigation}: Props) {
               refreshPurchaseState();
             } catch (error: any) {
               if (error.message !== 'E_USER_CANCELLED') {
-                Alert.alert(
-                  'Purchase Failed',
-                  'Unable to complete purchase. Please try again.',
-                );
+                Alert.alert('Purchase Failed', 'Unable to complete purchase. Please try again.');
               }
             }
             setIsPurchasing(null);
@@ -131,13 +163,9 @@ export default function StoreScreen({navigation}: Props) {
 
   const isPurchased = (productId: string) => IAPService.isPurchased(productId);
 
-  const renderProductCard = (
-    productId: string,
-    highlight?: boolean,
-  ) => {
+  const renderProductCard = (productId: string, highlight?: boolean) => {
     const info = PRODUCT_INFO[productId];
     if (!info) return null;
-
     const purchased = isPurchased(productId);
     const price = getPrice(productId);
     const purchasing = isPurchasing === productId;
@@ -173,7 +201,7 @@ export default function StoreScreen({navigation}: Props) {
           </Text>
         )}
         {!purchased && (
-          <TouchableOpacity
+          <AnimatedButton
             style={[
               styles.buyButton,
               highlight && styles.buyButtonHighlight,
@@ -184,11 +212,11 @@ export default function StoreScreen({navigation}: Props) {
             {purchasing ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={styles.buyButtonText}>
+              <Text style={[styles.buyButtonText, highlight && styles.buyButtonTextHighlight]}>
                 {highlight ? 'BUY NOW' : 'BUY'}
               </Text>
             )}
-          </TouchableOpacity>
+          </AnimatedButton>
         )}
       </View>
     );
@@ -198,7 +226,7 @@ export default function StoreScreen({navigation}: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFD700" />
+          <ActivityIndicator size="large" color={colors.gold} />
           <Text style={styles.loadingText}>Loading Store...</Text>
         </View>
       </SafeAreaView>
@@ -208,42 +236,44 @@ export default function StoreScreen({navigation}: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Premium Shop</Text>
-          <Text style={styles.subtitle}>Upgrade Your Experience</Text>
-        </View>
+        <Animated.View style={{opacity: fadeAnim, transform: [{translateY: slideAnim}]}}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>STORE</Text>
+            <Text style={styles.headerSubtitle}>Enhance Your Arsenal</Text>
+          </View>
 
-        {/* Bundle (highlighted) */}
-        {renderProductCard(PRODUCT_IDS.ACE_PILOT_BUNDLE, true)}
+          {/* Bundle (highlighted) */}
+          {renderProductCard(PRODUCT_IDS.ACE_PILOT_BUNDLE, true)}
 
-        {/* Individual products */}
-        {renderProductCard(PRODUCT_IDS.REMOVE_ADS)}
-        {renderProductCard(PRODUCT_IDS.PREMIUM_SKIN_PACK)}
-        {renderProductCard(PRODUCT_IDS.PREMIUM_THEME_PACK)}
-        {renderProductCard(PRODUCT_IDS.NICKNAME_FREEDOM)}
+          {/* Individual products */}
+          {renderProductCard(PRODUCT_IDS.REMOVE_ADS)}
+          {renderProductCard(PRODUCT_IDS.PREMIUM_SKIN_PACK)}
+          {renderProductCard(PRODUCT_IDS.PREMIUM_THEME_PACK)}
+          {renderProductCard(PRODUCT_IDS.NICKNAME_FREEDOM)}
 
-        {/* Restore Purchases */}
-        <View style={styles.restoreSection}>
-          <Text style={styles.restoreHint}>Already purchased?</Text>
+          {/* Restore Purchases */}
+          <View style={styles.restoreSection}>
+            <Text style={styles.restoreHint}>Already purchased?</Text>
+            <TouchableOpacity
+              style={[styles.restoreButton, isRestoring && styles.restoreButtonDisabled]}
+              onPress={handleRestore}
+              disabled={isRestoring}>
+              {isRestoring ? (
+                <ActivityIndicator color={colors.accent} size="small" />
+              ) : (
+                <Text style={styles.restoreButtonText}>RESTORE PURCHASES</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Back Button */}
           <TouchableOpacity
-            style={[styles.restoreButton, isRestoring && styles.restoreButtonDisabled]}
-            onPress={handleRestore}
-            disabled={isRestoring}>
-            {isRestoring ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.restoreButtonText}>Restore Purchases</Text>
-            )}
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>BACK TO MENU</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Back to Menu</Text>
-        </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -252,7 +282,7 @@ export default function StoreScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   content: {
     flex: 1,
@@ -267,7 +297,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    color: '#fff',
+    fontFamily: fonts.rajdhaniRegular,
+    color: colors.textPrimary,
     fontSize: 16,
     marginTop: 16,
   },
@@ -275,59 +306,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFD700',
+  headerTitle: {
+    fontFamily: fonts.orbitronBlack,
+    fontSize: 22,
+    color: colors.textPrimary,
+    letterSpacing: 4,
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#aaa',
+  headerSubtitle: {
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 14,
+    color: colors.textMuted,
     marginTop: 4,
   },
   productCard: {
-    backgroundColor: '#16213e',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 14,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   productCardHighlight: {
-    borderColor: '#FFD700',
+    borderColor: 'rgba(255, 215, 0, 0.4)',
     borderWidth: 2,
+    backgroundColor: 'rgba(255, 215, 0, 0.03)',
   },
   productCardPurchased: {
     opacity: 0.8,
-    borderColor: '#4CAF50',
+    borderColor: colors.successBorder,
   },
   bestValueBadge: {
     position: 'absolute',
     top: -10,
     right: 16,
-    backgroundColor: '#FFD700',
+    backgroundColor: colors.gold,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   bestValueText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#1a1a2e',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 8,
+    color: colors.bgPrimary,
+    letterSpacing: 1,
   },
   ownedBadge: {
     position: 'absolute',
     top: -10,
     right: 16,
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.success,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   ownedBadgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 8,
+    color: colors.bgPrimary,
+    letterSpacing: 1,
   },
   productHeader: {
     flexDirection: 'row',
@@ -336,48 +372,57 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   productTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.textPrimary,
     flex: 1,
+    letterSpacing: 1,
   },
   productPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFD700',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 16,
+    color: colors.gold,
   },
   productPricePurchased: {
-    color: '#4CAF50',
-    fontSize: 14,
+    color: colors.success,
+    fontSize: 12,
   },
   productDescription: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
     marginBottom: 12,
     lineHeight: 20,
   },
   savingsText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 13,
-    color: '#FFD700',
+    color: colors.gold,
     marginBottom: 12,
-    fontStyle: 'italic',
   },
   buyButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: colors.accentDim,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 20,
     alignItems: 'center',
   },
   buyButtonHighlight: {
-    backgroundColor: '#FFD700',
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
   },
   buyButtonDisabled: {
     opacity: 0.7,
   },
   buyButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 12,
+    color: colors.accent,
+    letterSpacing: 2,
+  },
+  buyButtonTextHighlight: {
+    color: colors.bgPrimary,
   },
   restoreSection: {
     alignItems: 'center',
@@ -385,36 +430,43 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: colors.divider,
   },
   restoreHint: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#888',
+    color: colors.textMuted,
     marginBottom: 8,
   },
   restoreButton: {
-    backgroundColor: '#607D8B',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingVertical: 12,
     paddingHorizontal: 32,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   restoreButtonDisabled: {
     opacity: 0.7,
   },
   restoreButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 12,
+    color: colors.textSecondary,
+    letterSpacing: 1,
   },
   backButton: {
-    backgroundColor: '#607D8B',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textSecondary,
+    fontSize: 13,
+    letterSpacing: 2,
   },
 });

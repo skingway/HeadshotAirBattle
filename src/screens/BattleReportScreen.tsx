@@ -3,7 +3,7 @@
  * Displays detailed battle report for a game
  */
 
-import React, {useEffect} from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,16 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  Animated,
+  Easing,
+  Pressable,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RouteProp} from '@react-navigation/native';
 import AuthService from '../services/AuthService';
 import BattleBoardDisplay from '../components/BattleBoardDisplay';
 import {AchievementService} from '../services/AchievementService';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -29,23 +33,71 @@ type Props = {
   route: RouteProp<RootStackParamList, 'BattleReport'>;
 };
 
+function AnimatedButton({
+  onPress,
+  style,
+  children,
+}: {
+  onPress: () => void;
+  style: any;
+  children: React.ReactNode;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  return (
+    <Pressable
+      onPressIn={() => {
+        Animated.spring(scaleAnim, {toValue: 0.97, useNativeDriver: true}).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(scaleAnim, {toValue: 1, useNativeDriver: true}).start();
+      }}
+      onPress={onPress}>
+      <Animated.View style={[style, {transform: [{scale: scaleAnim}]}]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function BattleReportScreen({navigation, route}: Props) {
   const {gameData} = route.params;
   const currentUserId = AuthService.getUserId();
   const isWinner = currentUserId && gameData.winner === currentUserId;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
-  // Unlock "analyst" achievement when viewing battle report
   useEffect(() => {
     const unlockAnalystAchievement = async () => {
       try {
         await AchievementService.manuallyUnlock('analyst');
-        console.log('[BattleReportScreen] Checked analyst achievement');
       } catch (error) {
         console.error('[BattleReportScreen] Error unlocking analyst achievement:', error);
       }
     };
-
     unlockAnalystAchievement();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {toValue: 1, duration: 400, useNativeDriver: true}),
+      Animated.timing(slideAnim, {toValue: 0, duration: 400, useNativeDriver: true}),
+    ]).start();
   }, []);
 
   const formatDate = (timestamp: number): string => {
@@ -61,7 +113,6 @@ export default function BattleReportScreen({navigation, route}: Props) {
   };
 
   const getGameDuration = (): string => {
-    // Estimate: ~30 seconds per turn
     const estimatedSeconds = gameData.totalTurns * 30;
     const minutes = Math.floor(estimatedSeconds / 60);
     const seconds = estimatedSeconds % 60;
@@ -69,9 +120,6 @@ export default function BattleReportScreen({navigation, route}: Props) {
   };
 
   const getAccuracyEstimate = (): string => {
-    // For AI games, estimate based on turns
-    // Rough estimate: boardSize * boardSize is total possible shots
-    const totalCells = gameData.boardSize * gameData.boardSize;
     const efficiency = ((gameData.airplaneCount * 12) / gameData.totalTurns) * 100;
     return efficiency.toFixed(1) + '%';
   };
@@ -80,183 +128,222 @@ export default function BattleReportScreen({navigation, route}: Props) {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={[styles.header, isWinner ? styles.winHeader : styles.lossHeader]}>
-        <Text style={styles.resultEmoji}>{isWinner ? '🎉' : '😔'}</Text>
-        <Text style={styles.resultTitle}>{isWinner ? 'VICTORY!' : 'DEFEAT'}</Text>
-        <Text style={styles.resultSubtitle}>
-          vs {getOpponentName()}
+        <Animated.Text
+          style={[
+            styles.resultEmoji,
+            {transform: [{translateY: floatAnim}]},
+            isWinner ? styles.winEmojiShadow : styles.lossEmojiShadow,
+          ]}>
+          {isWinner ? '\uD83C\uDFC6' : '\uD83D\uDC80'}
+        </Animated.Text>
+        <Text style={[styles.resultTitle, isWinner ? styles.winTitleColor : styles.lossTitleColor]}>
+          {isWinner ? 'VICTORY' : 'DEFEAT'}
         </Text>
+        <Text style={styles.resultSubtitle}>vs {getOpponentName()}</Text>
       </View>
 
       {/* Content */}
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Battle Boards */}
-        {(gameData.playerBoardData || gameData.aiBoardData) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🎯 Battle Overview</Text>
-            <View style={styles.boardsContainer}>
-              {gameData.playerBoardData && (
-                <BattleBoardDisplay
-                  boardSize={gameData.boardSize}
-                  boardData={gameData.playerBoardData}
-                  title="Your Board"
-                  cellSize={20}
-                />
-              )}
-              {gameData.aiBoardData && (
-                <BattleBoardDisplay
-                  boardSize={gameData.boardSize}
-                  boardData={gameData.aiBoardData}
-                  title="Opponent's Board"
-                  cellSize={20}
-                />
-              )}
+        <Animated.View style={{opacity: fadeAnim, transform: [{translateY: slideAnim}]}}>
+          {/* Info Tags */}
+          <View style={styles.tagsRow}>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{gameData.boardSize}x{gameData.boardSize}</Text>
+            </View>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{gameData.airplaneCount} ships</Text>
+            </View>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{gameData.totalTurns} turns</Text>
+            </View>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{gameData.gameType === 'ai' ? 'vs AI' : 'Online'}</Text>
             </View>
           </View>
-        )}
 
-        {/* Game Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📊 Game Summary</Text>
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Result</Text>
-              <Text style={[styles.summaryValue, isWinner ? styles.winText : styles.lossText]}>
-                {isWinner ? 'WIN' : 'LOSS'}
-              </Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Total Turns</Text>
-              <Text style={styles.summaryValue}>{gameData.totalTurns}</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Duration</Text>
-              <Text style={styles.summaryValue}>{getGameDuration()}</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Efficiency</Text>
-              <Text style={styles.summaryValue}>{getAccuracyEstimate()}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Game Configuration */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚙️ Game Configuration</Text>
-          <View style={styles.infoGrid}>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Game Type:</Text>
-              <Text style={styles.infoValue}>
-                {gameData.gameType === 'ai' ? '🤖 vs AI' : '🌐 Online'}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Board Size:</Text>
-              <Text style={styles.infoValue}>
-                {gameData.boardSize}×{gameData.boardSize}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Airplanes:</Text>
-              <Text style={styles.infoValue}>{gameData.airplaneCount} per player</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Completed:</Text>
-              <Text style={styles.infoValue}>{formatDate(gameData.completedAt)}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Players */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>👥 Players</Text>
+          {/* Score Cards */}
           <View style={styles.playersContainer}>
-            {/* Player 1 (You) */}
-            <View style={[styles.playerCard, isWinner && styles.winnerCard]}>
-              <Text style={styles.playerLabel}>You</Text>
-              <Text style={styles.playerName}>
+            <View style={[isWinner ? styles.cardHighlight : styles.card]}>
+              {isWinner && <Text style={styles.crownIcon}>{'\uD83D\uDC51'}</Text>}
+              <Text style={styles.playerLabel}>YOU</Text>
+              <Text style={[styles.playerName, {fontFamily: fonts.orbitronBold}]}>
                 {AuthService.getUserProfile()?.nickname || 'Unknown'}
               </Text>
-              {isWinner && <Text style={styles.winnerBadge}>🏆 Winner</Text>}
+              {isWinner ? (
+                <View style={styles.tagWin}>
+                  <Text style={styles.tagWinText}>WIN</Text>
+                </View>
+              ) : (
+                <View style={styles.tagLoss}>
+                  <Text style={styles.tagLossText}>LOSS</Text>
+                </View>
+              )}
             </View>
 
-            <View style={styles.vsText}>
-              <Text style={styles.vsLabel}>VS</Text>
-            </View>
+            <Text style={styles.vsLabel}>VS</Text>
 
-            {/* Player 2 (Opponent) */}
-            <View style={[styles.playerCard, !isWinner && styles.winnerCard]}>
-              <Text style={styles.playerLabel}>Opponent</Text>
-              <Text style={styles.playerName}>{getOpponentName()}</Text>
-              {!isWinner && <Text style={styles.winnerBadge}>🏆 Winner</Text>}
+            <View style={[!isWinner ? styles.cardHighlight : styles.card]}>
+              {!isWinner && <Text style={styles.crownIcon}>{'\uD83D\uDC51'}</Text>}
+              <Text style={styles.playerLabel}>OPPONENT</Text>
+              <Text style={[styles.playerName, {fontFamily: fonts.orbitronBold}]}>
+                {getOpponentName()}
+              </Text>
+              {!isWinner ? (
+                <View style={styles.tagWin}>
+                  <Text style={styles.tagWinText}>WIN</Text>
+                </View>
+              ) : (
+                <View style={styles.tagLoss}>
+                  <Text style={styles.tagLossText}>LOSS</Text>
+                </View>
+              )}
             </View>
           </View>
-        </View>
 
-        {/* Statistics (if available) */}
-        {gameData.playerStats && (
+          {/* Battle Boards */}
+          {(gameData.playerBoardData || gameData.aiBoardData) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>BATTLE OVERVIEW</Text>
+              <View style={styles.mapContainer}>
+                {gameData.playerBoardData && (
+                  <BattleBoardDisplay
+                    boardSize={gameData.boardSize}
+                    boardData={gameData.playerBoardData}
+                    title="Your Board"
+                    cellSize={20}
+                  />
+                )}
+                {gameData.aiBoardData && (
+                  <BattleBoardDisplay
+                    boardSize={gameData.boardSize}
+                    boardData={gameData.aiBoardData}
+                    title="Opponent's Board"
+                    cellSize={20}
+                  />
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Game Summary */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📈 Battle Statistics</Text>
-            <View style={styles.statsContainer}>
-              <View style={styles.statColumn}>
-                <Text style={styles.statColumnTitle}>You</Text>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Hits</Text>
-                  <Text style={styles.statValue}>{gameData.playerStats?.hits || 0}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Misses</Text>
-                  <Text style={styles.statValue}>{gameData.playerStats?.misses || 0}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Kills</Text>
-                  <Text style={styles.statValue}>{gameData.playerStats?.kills || 0}</Text>
-                </View>
+            <Text style={styles.sectionTitle}>GAME SUMMARY</Text>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>RESULT</Text>
+                <Text style={[styles.summaryValue, isWinner ? {color: colors.accent} : {color: colors.danger}]}>
+                  {isWinner ? 'WIN' : 'LOSS'}
+                </Text>
               </View>
-
-              <View style={styles.statDivider} />
-
-              <View style={styles.statColumn}>
-                <Text style={styles.statColumnTitle}>Opponent</Text>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Hits</Text>
-                  <Text style={styles.statValue}>{gameData.aiStats?.hits || '?'}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Misses</Text>
-                  <Text style={styles.statValue}>{gameData.aiStats?.misses || '?'}</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statLabel}>Kills</Text>
-                  <Text style={styles.statValue}>{gameData.aiStats?.kills || '?'}</Text>
-                </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>TOTAL TURNS</Text>
+                <Text style={styles.summaryValue}>{gameData.totalTurns}</Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>DURATION</Text>
+                <Text style={styles.summaryValue}>{getGameDuration()}</Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>EFFICIENCY</Text>
+                <Text style={styles.summaryValue}>{getAccuracyEstimate()}</Text>
               </View>
             </View>
           </View>
-        )}
 
-        {/* Note about replay */}
-        <View style={styles.noteSection}>
-          <Text style={styles.noteEmoji}>💡</Text>
-          <Text style={styles.noteText}>
-            Full battle replay feature coming soon! This will allow you to review each turn
-            and see exactly how the battle unfolded.
-          </Text>
-        </View>
+          {/* Game Configuration */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>CONFIGURATION</Text>
+            <View style={styles.infoGrid}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Game Type</Text>
+                <Text style={styles.infoValue}>
+                  {gameData.gameType === 'ai' ? 'vs AI' : 'Online'}
+                </Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Board Size</Text>
+                <Text style={styles.infoValue}>{gameData.boardSize}x{gameData.boardSize}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Airplanes</Text>
+                <Text style={styles.infoValue}>{gameData.airplaneCount} per player</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Completed</Text>
+                <Text style={styles.infoValue}>{formatDate(gameData.completedAt)}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Statistics */}
+          {gameData.playerStats && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>BATTLE STATISTICS</Text>
+              <View style={styles.statsContainer}>
+                <View style={styles.statColumn}>
+                  <Text style={[styles.statColumnTitle, {color: colors.accent}]}>You</Text>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Hits</Text>
+                    <Text style={styles.statValue}>{gameData.playerStats?.hits || 0}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Misses</Text>
+                    <Text style={styles.statValue}>{gameData.playerStats?.misses || 0}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Kills</Text>
+                    <Text style={styles.statValue}>{gameData.playerStats?.kills || 0}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.statDivider} />
+
+                <View style={styles.statColumn}>
+                  <Text style={[styles.statColumnTitle, {color: colors.goldDark}]}>Opponent</Text>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Hits</Text>
+                    <Text style={styles.statValue}>{gameData.aiStats?.hits || '?'}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Misses</Text>
+                    <Text style={styles.statValue}>{gameData.aiStats?.misses || '?'}</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Kills</Text>
+                    <Text style={styles.statValue}>{gameData.aiStats?.kills || '?'}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Note */}
+          <View style={styles.noteSection}>
+            <Text style={styles.noteEmoji}>{'\uD83D\uDCA1'}</Text>
+            <Text style={styles.noteText}>
+              Full battle replay feature coming soon! This will allow you to review each turn
+              and see exactly how the battle unfolded.
+            </Text>
+          </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Bottom Buttons */}
       <View style={styles.bottomButtons}>
-        <TouchableOpacity
-          style={[styles.button, styles.backButton]}
+        <AnimatedButton
+          style={styles.btnBack}
           onPress={() => navigation.goBack()}>
-          <Text style={styles.buttonText}>← Back to History</Text>
-        </TouchableOpacity>
+          <Text style={styles.btnBackText}>BACK</Text>
+        </AnimatedButton>
 
-        <TouchableOpacity
-          style={[styles.button, styles.mainMenuButton]}
+        <AnimatedButton
+          style={styles.btnMain}
           onPress={() => navigation.navigate('MainMenu')}>
-          <Text style={styles.buttonText}>🏠 Main Menu</Text>
-        </TouchableOpacity>
+          <Text style={styles.btnMainText}>MAIN MENU</Text>
+        </AnimatedButton>
       </View>
     </SafeAreaView>
   );
@@ -265,55 +352,175 @@ export default function BattleReportScreen({navigation, route}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   header: {
     alignItems: 'center',
-    padding: 30,
-    borderBottomWidth: 3,
+    padding: 24,
+    borderBottomWidth: 2,
   },
   winHeader: {
-    backgroundColor: '#1a4d2e',
-    borderBottomColor: '#4CAF50',
+    backgroundColor: 'rgba(255, 215, 0, 0.05)',
+    borderBottomColor: 'rgba(255, 215, 0, 0.3)',
   },
   lossHeader: {
-    backgroundColor: '#4d1a1a',
-    borderBottomColor: '#F44336',
+    backgroundColor: 'rgba(255, 68, 68, 0.05)',
+    borderBottomColor: colors.dangerBorder,
   },
   resultEmoji: {
     fontSize: 48,
     marginBottom: 10,
   },
+  winEmojiShadow: {
+    textShadowColor: 'rgba(255, 215, 0, 0.5)',
+    textShadowOffset: {width: 0, height: 0},
+    textShadowRadius: 15,
+  },
+  lossEmojiShadow: {
+    textShadowColor: 'rgba(255, 68, 68, 0.5)',
+    textShadowOffset: {width: 0, height: 0},
+    textShadowRadius: 15,
+  },
   resultTitle: {
+    fontFamily: fonts.orbitronBlack,
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
     marginBottom: 5,
+    letterSpacing: 3,
+  },
+  winTitleColor: {
+    color: colors.gold,
+  },
+  lossTitleColor: {
+    color: colors.danger,
   },
   resultSubtitle: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 16,
-    color: '#ddd',
+    color: colors.textSecondary,
   },
   content: {
     flex: 1,
   },
   contentContainer: {
-    padding: 20,
+    padding: 16,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  tag: {
+    backgroundColor: colors.accentDim,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  tagText: {
+    fontFamily: fonts.rajdhaniSemiBold,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  playersContainer: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  card: {
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+  },
+  cardHighlight: {
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accentGlow,
+    borderRadius: 14,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: colors.accent,
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+    elevation: 5,
+  },
+  crownIcon: {
+    fontSize: 24,
+    marginBottom: 4,
+  },
+  playerLabel: {
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 11,
+    color: colors.textMuted,
+    letterSpacing: 2,
+  },
+  playerName: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 18,
+    color: colors.textPrimary,
+    marginVertical: 4,
+  },
+  tagWin: {
+    backgroundColor: colors.successDim,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginTop: 6,
+  },
+  tagWinText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 11,
+    color: colors.success,
+  },
+  tagLoss: {
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginTop: 6,
+  },
+  tagLossText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 11,
+    color: colors.danger,
+  },
+  vsLabel: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 16,
+    color: colors.textDark,
+    textAlign: 'center',
+    paddingVertical: 4,
   },
   section: {
-    backgroundColor: '#16213e',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 15,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginBottom: 15,
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    letterSpacing: 2,
+    paddingLeft: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    marginBottom: 12,
+    marginTop: 8,
   },
-  boardsContainer: {
-    gap: 20,
+  mapContainer: {
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.2)',
+    borderRadius: 12,
+    padding: 12,
+    gap: 16,
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -322,160 +529,151 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     width: '48%',
-    backgroundColor: '#0f3460',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
+    borderRadius: 12,
+    padding: 14,
     alignItems: 'center',
+    marginBottom: 10,
   },
   summaryLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 8,
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 11,
+    color: colors.textMuted,
+    marginBottom: 6,
+    letterSpacing: 1,
   },
   summaryValue: {
+    fontFamily: fonts.orbitronExtraBold,
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  winText: {
-    color: '#4CAF50',
-  },
-  lossText: {
-    color: '#F44336',
+    color: colors.textPrimary,
   },
   infoGrid: {
-    gap: 12,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
+    borderRadius: 14,
+    padding: 16,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#999',
-  },
-  infoValue: {
-    fontSize: 14,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  playersContainer: {
-    gap: 15,
-  },
-  playerCard: {
-    backgroundColor: '#0f3460',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  winnerCard: {
-    borderColor: '#FFD700',
-    backgroundColor: '#1a4d2e',
-  },
-  playerLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 5,
-  },
-  playerName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  winnerBadge: {
-    fontSize: 14,
-    color: '#FFD700',
-    marginTop: 8,
-  },
-  vsText: {
-    alignItems: 'center',
     paddingVertical: 10,
   },
-  vsLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#666',
+  infoLabel: {
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 14,
+    color: colors.textMuted,
+  },
+  infoValue: {
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.divider,
   },
   statsContainer: {
     flexDirection: 'row',
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
+    borderRadius: 14,
+    padding: 16,
   },
   statColumn: {
     flex: 1,
   },
   statColumnTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 12,
     marginBottom: 12,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   statItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 8,
     paddingHorizontal: 10,
-    backgroundColor: '#0f3460',
-    borderRadius: 6,
-    marginBottom: 8,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 8,
+    marginBottom: 6,
   },
   statLabel: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 13,
-    color: '#999',
+    color: colors.textMuted,
   },
   statValue: {
+    fontFamily: fonts.orbitronSemiBold,
     fontSize: 13,
-    fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textPrimary,
   },
   statDivider: {
-    width: 2,
-    backgroundColor: '#0f3460',
-    marginHorizontal: 15,
+    width: 1,
+    backgroundColor: colors.divider,
+    marginHorizontal: 12,
   },
   noteSection: {
-    backgroundColor: '#2c2c3e',
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.3)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
     padding: 20,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
   },
   noteEmoji: {
     fontSize: 32,
     marginBottom: 10,
   },
   noteText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 13,
-    color: '#999',
+    color: colors.textMuted,
     textAlign: 'center',
     lineHeight: 20,
   },
   bottomButtons: {
     flexDirection: 'row',
-    padding: 20,
+    padding: 16,
     gap: 10,
   },
-  button: {
+  btnBack: {
     flex: 1,
-    padding: 15,
-    borderRadius: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  backButton: {
-    backgroundColor: '#607D8B',
+  btnBackText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 13,
+    color: colors.textSecondary,
+    letterSpacing: 2,
   },
-  mainMenuButton: {
-    backgroundColor: '#4CAF50',
+  btnMain: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+    shadowColor: colors.accent,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+  btnMainText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 13,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
 });

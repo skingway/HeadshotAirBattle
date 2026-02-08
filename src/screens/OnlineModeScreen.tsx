@@ -3,7 +3,7 @@
  * Choose between Quick Match and Private Room
  */
 
-import React, {useState} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {
   View,
   Text,
@@ -14,10 +14,13 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Animated,
+  Pressable,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import MatchmakingService from '../services/MatchmakingService';
 import RoomService from '../services/RoomService';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -31,10 +34,47 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'OnlineMode'>;
 };
 
+function AnimatedButton({
+  onPress,
+  style,
+  children,
+  disabled,
+}: {
+  onPress: () => void;
+  style: any;
+  children: React.ReactNode;
+  disabled?: boolean;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  return (
+    <Pressable
+      onPressIn={() => {
+        if (!disabled) Animated.spring(scaleAnim, {toValue: 0.97, useNativeDriver: true}).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(scaleAnim, {toValue: 1, useNativeDriver: true}).start();
+      }}
+      onPress={disabled ? undefined : onPress}>
+      <Animated.View style={[style, {transform: [{scale: scaleAnim}]}]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function OnlineModeScreen({navigation}: Props) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {toValue: 1, duration: 400, useNativeDriver: true}),
+      Animated.timing(slideAnim, {toValue: 0, duration: 400, useNativeDriver: true}),
+    ]).start();
+  }, []);
 
   const handleQuickMatch = () => {
     navigation.navigate('Matchmaking', {mode: 'standard'});
@@ -48,7 +88,6 @@ export default function OnlineModeScreen({navigation}: Props) {
         boardSize: 10,
         airplaneCount: 3,
       });
-
       if (result.success && result.roomCode && result.gameId) {
         navigation.navigate('RoomLobby', {
           gameId: result.gameId,
@@ -59,7 +98,6 @@ export default function OnlineModeScreen({navigation}: Props) {
       }
     } catch (error) {
       Alert.alert('Error', 'An error occurred while creating room');
-      console.error('[OnlineModeScreen] Error creating room:', error);
     } finally {
       setIsCreating(false);
     }
@@ -67,21 +105,17 @@ export default function OnlineModeScreen({navigation}: Props) {
 
   const handleJoinRoom = async () => {
     const trimmedCode = roomCodeInput.trim().toUpperCase();
-
     if (trimmedCode.length !== 6) {
       Alert.alert('Invalid Code', 'Room code must be 6 characters');
       return;
     }
-
     if (!RoomService.isValidRoomCode(trimmedCode)) {
       Alert.alert('Invalid Code', 'Room code can only contain letters and numbers');
       return;
     }
-
     setIsJoining(true);
     try {
       const result = await RoomService.joinRoom(trimmedCode);
-
       if (result.success && result.gameId) {
         navigation.navigate('RoomLobby', {
           gameId: result.gameId,
@@ -92,7 +126,6 @@ export default function OnlineModeScreen({navigation}: Props) {
       }
     } catch (error) {
       Alert.alert('Error', 'An error occurred while joining room');
-      console.error('[OnlineModeScreen] Error joining room:', error);
     } finally {
       setIsJoining(false);
     }
@@ -101,100 +134,102 @@ export default function OnlineModeScreen({navigation}: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Online Multiplayer</Text>
-          <Text style={styles.subtitle}>Play against real players</Text>
-        </View>
+        <Animated.View style={{opacity: fadeAnim, transform: [{translateY: slideAnim}]}}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>ONLINE MODE</Text>
+            <Text style={styles.subtitle}>Play against real players</Text>
+          </View>
 
-        {/* Quick Match Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardIcon}>⚡</Text>
-            <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Quick Match</Text>
-              <Text style={styles.cardDescription}>
-                Automatic matchmaking with online players
-              </Text>
+          {/* Quick Match Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIcon}>{'\u26A1'}</Text>
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardTitle}>QUICK MATCH</Text>
+                <Text style={styles.cardDescription}>
+                  Automatic matchmaking with online players
+                </Text>
+              </View>
             </View>
+            <AnimatedButton
+              style={styles.btnPrimary}
+              onPress={handleQuickMatch}>
+              <Text style={styles.btnPrimaryText}>FIND MATCH</Text>
+            </AnimatedButton>
           </View>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleQuickMatch}>
-            <Text style={styles.buttonText}>Find Match</Text>
-          </TouchableOpacity>
-        </View>
 
-        {/* Private Room Card */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardIcon}>🏠</Text>
-            <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Private Room</Text>
-              <Text style={styles.cardDescription}>
-                Create or join a room with friends
-              </Text>
+          {/* Private Room Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardIcon}>{'\uD83C\uDFE0'}</Text>
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardTitle}>PRIVATE ROOM</Text>
+                <Text style={styles.cardDescription}>
+                  Create or join a room with friends
+                </Text>
+              </View>
             </View>
+
+            <AnimatedButton
+              style={styles.btnSecondary}
+              onPress={handleCreateRoom}
+              disabled={isCreating}>
+              {isCreating ? (
+                <ActivityIndicator color={colors.accent} />
+              ) : (
+                <Text style={styles.btnSecondaryText}>CREATE ROOM</Text>
+              )}
+            </AnimatedButton>
+
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Enter 6-digit room code"
+              placeholderTextColor={colors.textDark}
+              value={roomCodeInput}
+              onChangeText={setRoomCodeInput}
+              maxLength={6}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+
+            <AnimatedButton
+              style={[
+                styles.btnTertiary,
+                !roomCodeInput.trim() && styles.buttonDisabled,
+              ]}
+              onPress={handleJoinRoom}
+              disabled={!roomCodeInput.trim() || isJoining}>
+              {isJoining ? (
+                <ActivityIndicator color={colors.textSecondary} />
+              ) : (
+                <Text style={styles.btnTertiaryText}>JOIN ROOM</Text>
+              )}
+            </AnimatedButton>
           </View>
 
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handleCreateRoom}
-            disabled={isCreating}>
-            {isCreating ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Create Room</Text>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
+          {/* Info Box */}
+          <View style={styles.infoBox}>
+            <Text style={styles.infoIcon}>{'\uD83D\uDCA1'}</Text>
+            <Text style={styles.infoText}>
+              Quick Match pairs you with players of similar skill level.
+              Private Rooms let you play with specific friends using a room code.
+            </Text>
           </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Enter 6-digit room code"
-            placeholderTextColor="#666"
-            value={roomCodeInput}
-            onChangeText={setRoomCodeInput}
-            maxLength={6}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
-
-          <TouchableOpacity
-            style={[
-              styles.secondaryButton,
-              !roomCodeInput.trim() && styles.buttonDisabled,
-            ]}
-            onPress={handleJoinRoom}
-            disabled={!roomCodeInput.trim() || isJoining}>
-            {isJoining ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Join Room</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoIcon}>💡</Text>
-          <Text style={styles.infoText}>
-            Quick Match pairs you with players of similar skill level.
-            Private Rooms let you play with specific friends using a room code.
-          </Text>
-        </View>
-
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>← Back to Menu</Text>
-        </TouchableOpacity>
+          {/* Back Button */}
+          <AnimatedButton
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>BACK TO MENU</Text>
+          </AnimatedButton>
+        </Animated.View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -203,7 +238,7 @@ export default function OnlineModeScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   scrollView: {
     flex: 1,
@@ -218,20 +253,24 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 22,
+    color: colors.textPrimary,
+    letterSpacing: 3,
     marginBottom: 8,
   },
   subtitle: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 16,
-    color: '#aaa',
+    color: colors.textMuted,
   },
   card: {
-    backgroundColor: '#16213e',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
+    borderRadius: 14,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -239,43 +278,73 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   cardIcon: {
-    fontSize: 48,
+    fontSize: 40,
     marginRight: 16,
   },
   cardHeaderText: {
     flex: 1,
   },
   cardTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 16,
+    color: colors.textPrimary,
+    letterSpacing: 1,
     marginBottom: 4,
   },
   cardDescription: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
   },
-  primaryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 16,
-    borderRadius: 10,
+  btnPrimary: {
+    backgroundColor: colors.accent,
+    paddingVertical: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: colors.accent,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  btnPrimaryText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    letterSpacing: 2,
+  },
+  btnSecondary: {
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  secondaryButton: {
-    backgroundColor: '#2196F3',
-    padding: 16,
-    borderRadius: 10,
+  btnSecondaryText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.accent,
+    letterSpacing: 2,
+  },
+  btnTertiary: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
+  },
+  btnTertiaryText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.textSecondary,
+    letterSpacing: 2,
   },
   buttonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  divider: {
+  dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 20,
@@ -283,28 +352,34 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#0f3460',
+    backgroundColor: colors.divider,
   },
   dividerText: {
-    color: '#666',
+    fontFamily: fonts.rajdhaniSemiBold,
+    color: colors.textDark,
     fontSize: 14,
     marginHorizontal: 16,
+    letterSpacing: 2,
   },
   input: {
-    backgroundColor: '#0f3460',
-    color: '#fff',
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
+    color: colors.textPrimary,
+    fontFamily: fonts.orbitronBold,
     fontSize: 18,
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 12,
     textAlign: 'center',
     letterSpacing: 4,
-    fontWeight: 'bold',
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
   },
   infoBox: {
     flexDirection: 'row',
-    backgroundColor: '#2c2c3e',
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.3)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
     padding: 16,
     marginBottom: 20,
   },
@@ -314,19 +389,23 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 13,
-    color: '#aaa',
+    color: colors.textMuted,
     lineHeight: 20,
   },
   backButton: {
-    backgroundColor: '#607D8B',
-    padding: 16,
-    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textSecondary,
+    fontSize: 13,
+    letterSpacing: 2,
   },
 });

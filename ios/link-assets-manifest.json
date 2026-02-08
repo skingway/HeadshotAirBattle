@@ -1,0 +1,49 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "assets/fonts/Orbitron-Black.ttf",
+      "sha1": "9f020e2f7e59a511f0cfc86e6a9f533341b237b2"
+    },
+    {
+      "path": "assets/fonts/Orbitron-Medium.ttf",
+      "sha1": "e90a8a265e91613e3a325eaa9e117cb81695c2d1"
+    },
+    {
+      "path": "assets/fonts/Rajdhani-Medium.ttf",
+      "sha1": "7837ff8a9aea59e742e894ba8956c18fb7c16d4b"
+    },
+    {
+      "path": "assets/fonts/Rajdhani-SemiBold.ttf",
+      "sha1": "631daaffec8f19b9b0c23a80b3465a278993e22a"
+    },
+    {
+      "path": "assets/fonts/Rajdhani-Light.ttf",
+      "sha1": "446edd8562d2ad5ce7e4a345cf87759cfa47bd39"
+    },
+    {
+      "path": "assets/fonts/Orbitron-ExtraBold.ttf",
+      "sha1": "c9734caae727540904f9be9c10a3eac36ecc54c8"
+    },
+    {
+      "path": "assets/fonts/Orbitron-Regular.ttf",
+      "sha1": "3a5cfd923aeffebf00fd40c67bff2e315aa30ebe"
+    },
+    {
+      "path": "assets/fonts/Rajdhani-Bold.ttf",
+      "sha1": "fb82c1992ff13cb2bc6fa12c29ffcb89974adb7b"
+    },
+    {
+      "path": "assets/fonts/Orbitron-SemiBold.ttf",
+      "sha1": "0a244cd24cd5ec0028b23cdc7cf996e2625f4120"
+    },
+    {
+      "path": "assets/fonts/Orbitron-Bold.ttf",
+      "sha1": "8cbee15da2597d4154d2e8fc82e4532a66d41fc8"
+    },
+    {
+      "path": "assets/fonts/Rajdhani-Regular.ttf",
+      "sha1": "b15421316b5c5bb92af38cb6b8db1a8df554cec4"
+    }
+  ]
+}

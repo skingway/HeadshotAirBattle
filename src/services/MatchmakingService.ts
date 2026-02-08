@@ -4,6 +4,7 @@
  */
 
 import firestore from '@react-native-firebase/firestore';
+import database from '@react-native-firebase/database';
 import AuthService from './AuthService';
 import StatisticsService from './StatisticsService';
 import MultiplayerService from './MultiplayerService';
@@ -23,6 +24,7 @@ type MatchFoundCallback = (gameId: string) => void;
 
 class MatchmakingServiceClass {
   private queueListener: (() => void) | null = null;
+  private pendingMatchListener: (() => void) | null = null;
   private matchFoundCallback: MatchFoundCallback | null = null;
   private isInQueue: boolean = false;
   private matchCheckInterval: NodeJS.Timeout | null = null;
@@ -125,6 +127,9 @@ class MatchmakingServiceClass {
         .doc(userId)
         .delete();
 
+      // Clean up any pending match entry
+      await database().ref(`pendingMatches/${userId}`).remove().catch(() => {});
+
       this.stopMatchListening();
       this.stopMatchChecking();
       this.isInQueue = false;
@@ -139,12 +144,19 @@ class MatchmakingServiceClass {
 
   /**
    * Start listening for match found
+   * Listens on both:
+   * 1. Own Firestore queue doc (for when WE find a match and update our own doc)
+   * 2. RTDB pendingMatches/{userId} (for when OPPONENT finds us and creates a pending match)
    */
   private startMatchListening(userId: string): void {
     if (this.queueListener) {
       this.queueListener();
     }
+    if (this.pendingMatchListener) {
+      this.pendingMatchListener();
+    }
 
+    // Listen on own Firestore queue doc (match creator updates their own doc)
     const unsubscribe = firestore()
       .collection('matchmakingQueue')
       .doc(userId)
@@ -158,12 +170,30 @@ class MatchmakingServiceClass {
         const data = snapshot.data() as QueueEntry;
 
         if (data.status === 'matched' && data.matchId) {
-          console.log('[MatchmakingService] ✓ Match found:', data.matchId);
+          console.log('[MatchmakingService] Match found via own doc:', data.matchId);
           this.handleMatchFound(data.matchId);
         }
       });
 
     this.queueListener = unsubscribe;
+
+    // Listen on RTDB pendingMatches for when opponent matches us
+    const pendingRef = database().ref(`pendingMatches/${userId}`);
+    const onValue = pendingRef.on('value', snapshot => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        if (data.gameId) {
+          console.log('[MatchmakingService] Match found via pendingMatches:', data.gameId);
+          // Clean up the pending match entry
+          pendingRef.remove().catch(() => {});
+          this.handleMatchFound(data.gameId);
+        }
+      }
+    });
+
+    this.pendingMatchListener = () => {
+      pendingRef.off('value', onValue);
+    };
   }
 
   /**
@@ -173,6 +203,10 @@ class MatchmakingServiceClass {
     if (this.queueListener) {
       this.queueListener();
       this.queueListener = null;
+    }
+    if (this.pendingMatchListener) {
+      this.pendingMatchListener();
+      this.pendingMatchListener = null;
     }
   }
 
@@ -218,11 +252,12 @@ class MatchmakingServiceClass {
 
       const myEntry = myEntrySnapshot.data() as QueueEntry;
 
+      // If we've already been matched by the other player, don't search
       if (myEntry.status !== 'waiting') {
         return;
       }
 
-      // Find suitable opponent
+      // Find suitable opponent - query all waiting players regardless of platform
       const opponentsSnapshot = await firestore()
         .collection('matchmakingQueue')
         .where('status', '==', 'waiting')
@@ -267,55 +302,82 @@ class MatchmakingServiceClass {
 
   /**
    * Create a match between two players
+   *
+   * NOTE: Firestore security rules for matchmakingQueue/{userId} only allow
+   * each user to write their own document. So we cannot use a transaction
+   * that updates both players' docs from one user's context.
+   *
+   * Instead, we:
+   * 1. Read both docs to verify they're still waiting
+   * 2. Create the game in RTDB
+   * 3. Update our own doc (which we have permission to write)
+   * 4. Update the opponent's doc via a shared "matches" collection that
+   *    both users can read, or update it directly since the opponent's
+   *    listener will pick up the matchId.
+   *
+   * Actually the simplest fix: use a shared "matches" document that both
+   * players' listeners can detect. But the easiest compatible fix is to
+   * update the opponent's doc using the Firestore admin-style approach.
+   *
+   * Simplest fix: Since both players are polling via tryMatchWithOpponent,
+   * we only need to update our OWN doc with matchId. The opponent will
+   * detect the game because we store a pending match reference that
+   * the opponent checks on their next poll.
    */
   private async createMatch(
     player1: QueueEntry,
     player2: QueueEntry & { id: string }
   ): Promise<void> {
     try {
-      // Use Firestore transaction to ensure atomicity
-      await firestore().runTransaction(async transaction => {
-        const player1Ref = firestore().collection('matchmakingQueue').doc(player1.userId);
-        const player2Ref = firestore().collection('matchmakingQueue').doc(player2.userId);
+      // First verify both players are still waiting (read-only, no security issue)
+      const player1Ref = firestore().collection('matchmakingQueue').doc(player1.userId);
+      const player2Ref = firestore().collection('matchmakingQueue').doc(player2.userId);
 
-        const player1Doc = await transaction.get(player1Ref);
-        const player2Doc = await transaction.get(player2Ref);
+      const [player1Doc, player2Doc] = await Promise.all([
+        player1Ref.get(),
+        player2Ref.get(),
+      ]);
 
-        // Check if both are still waiting
-        if (!player1Doc.exists || !player2Doc.exists) {
-          throw new Error('Player no longer in queue');
-        }
+      if (!player1Doc.exists || !player2Doc.exists) {
+        console.log('[MatchmakingService] Player no longer in queue');
+        return;
+      }
 
-        const p1Data = player1Doc.data() as QueueEntry;
-        const p2Data = player2Doc.data() as QueueEntry;
+      const p1Data = player1Doc.data() as QueueEntry;
+      const p2Data = player2Doc.data() as QueueEntry;
 
-        if (p1Data.status !== 'waiting' || p2Data.status !== 'waiting') {
-          throw new Error('Player already matched');
-        }
+      if (p1Data.status !== 'waiting' || p2Data.status !== 'waiting') {
+        console.log('[MatchmakingService] Player already matched');
+        return;
+      }
 
-        // Create game
-        const gameResult = await MultiplayerService.createGame({
-          gameType: 'quickMatch',
-          mode: player1.preferredMode,
-        });
-
-        if (!gameResult.success || !gameResult.gameId) {
-          throw new Error('Failed to create game');
-        }
-
-        // Update both players' status
-        transaction.update(player1Ref, {
-          status: 'matched',
-          matchId: gameResult.gameId,
-        });
-
-        transaction.update(player2Ref, {
-          status: 'matched',
-          matchId: gameResult.gameId,
-        });
-
-        console.log('[MatchmakingService] ✓ Match created:', gameResult.gameId);
+      // Create game in RTDB (this is fine, activeGames has open write rules for auth users)
+      const gameResult = await MultiplayerService.createGame({
+        gameType: 'quickMatch',
+        mode: player1.preferredMode,
       });
+
+      if (!gameResult.success || !gameResult.gameId) {
+        console.error('[MatchmakingService] Failed to create game');
+        return;
+      }
+
+      // Update our own doc (we have permission for this)
+      await player1Ref.update({
+        status: 'matched',
+        matchId: gameResult.gameId,
+      });
+
+      // For the opponent's doc, we cannot write it directly due to security rules.
+      // Instead, write to RTDB pendingMatches which has open auth-write rules.
+      // The opponent's listener on pendingMatches/{userId} will detect this.
+      await database().ref(`pendingMatches/${player2.userId}`).set({
+        gameId: gameResult.gameId,
+        matchedBy: player1.userId,
+        timestamp: Date.now(),
+      });
+
+      console.log('[MatchmakingService] Match created:', gameResult.gameId);
     } catch (error) {
       console.error('[MatchmakingService] Error creating match:', error);
     }

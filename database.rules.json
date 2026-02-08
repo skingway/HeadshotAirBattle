@@ -36,6 +36,14 @@
       }
     },
 
+    // App: Pending matches for cross-platform matchmaking
+    "pendingMatches": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null"
+      }
+    },
+
     // App: Room codes (6-character codes)
     "roomCodes": {
       ".read": "auth != null",

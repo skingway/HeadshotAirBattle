@@ -14,6 +14,7 @@ import {
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import AudioManager from '../services/AudioManager';
 import AuthService from '../services/AuthService';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -145,7 +146,7 @@ export default function SettingsScreen({navigation}: Props) {
             <Switch
               value={audioEnabled}
               onValueChange={handleAudioToggle}
-              trackColor={{false: '#767577', true: '#4CAF50'}}
+              trackColor={{false: 'rgba(255,255,255,0.15)', true: colors.accent}}
               thumbColor={audioEnabled ? '#fff' : '#f4f3f4'}
             />
           </View>
@@ -254,7 +255,7 @@ export default function SettingsScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   content: {
     flex: 1,
@@ -263,23 +264,30 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#16213e',
+    borderBottomColor: colors.divider,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 20,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
   section: {
     margin: 20,
     padding: 20,
-    backgroundColor: '#16213e',
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
+    borderRadius: 14,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    letterSpacing: 2,
+    paddingLeft: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
     marginBottom: 15,
   },
   settingRow: {
@@ -289,8 +297,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   settingLabel: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textPrimary,
   },
   volumeControl: {
     flexDirection: 'row',
@@ -299,19 +308,22 @@ const styles = StyleSheet.create({
   volumeButton: {
     width: 40,
     height: 40,
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   volumeButtonText: {
-    fontSize: 24,
-    color: '#fff',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 20,
+    color: colors.accent,
   },
   volumeValue: {
+    fontFamily: fonts.orbitronSemiBold,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textPrimary,
     marginHorizontal: 15,
     minWidth: 50,
     textAlign: 'center',
@@ -328,65 +340,74 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginTop: 5,
     borderTopWidth: 1,
-    borderTopColor: '#2a3a5e',
+    borderTopColor: colors.divider,
   },
   linkText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 14,
-    color: '#4a90e2',
-    fontWeight: 'bold',
+    color: colors.accent,
   },
   infoLabel: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
   },
   infoValue: {
-    fontSize: 14,
-    color: '#fff',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.textPrimary,
   },
   accountStatus: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 14,
-    color: '#aaa',
-    fontWeight: 'bold',
+    color: colors.textMuted,
   },
   accountStatusGoogle: {
     color: '#4285F4',
   },
   signInButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     padding: 14,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
   },
   signInButtonDisabled: {
     opacity: 0.7,
   },
   signInButtonText: {
-    color: '#fff',
+    fontFamily: fonts.rajdhaniSemiBold,
+    color: colors.textPrimary,
     fontSize: 16,
-    fontWeight: 'bold',
   },
   signOutSettingsButton: {
-    backgroundColor: '#D32F2F',
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
     padding: 14,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
   },
   signOutSettingsButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.danger,
+    fontSize: 13,
+    letterSpacing: 1,
   },
   backButton: {
     margin: 20,
     padding: 15,
-    backgroundColor: '#546e7a',
-    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textSecondary,
+    fontSize: 13,
+    letterSpacing: 2,
   },
 });

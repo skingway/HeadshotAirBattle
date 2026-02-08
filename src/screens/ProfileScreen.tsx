@@ -4,7 +4,7 @@
  * Supports Google Sign-In and account management
  */
 
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useFocusEffect} from '@react-navigation/native';
@@ -24,6 +25,7 @@ import AuthService from '../services/AuthService';
 import StatisticsService from '../services/StatisticsService';
 import AdService from '../services/AdService';
 import {AD_UNIT_IDS} from '../config/AdConfig';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -50,12 +52,17 @@ export default function ProfileScreen({navigation}: Props) {
     losses: 0,
     winRate: 0,
   });
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     loadProfile();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {toValue: 1, duration: 400, useNativeDriver: true}),
+      Animated.timing(slideAnim, {toValue: 0, duration: 400, useNativeDriver: true}),
+    ]).start();
   }, []);
 
-  // Refresh statistics when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadStatistics();
@@ -64,9 +71,7 @@ export default function ProfileScreen({navigation}: Props) {
   );
 
   const loadStatistics = async () => {
-    console.log('[ProfileScreen] Loading statistics...');
     const stats = await StatisticsService.refresh();
-    console.log('[ProfileScreen] Statistics loaded:', stats);
     setStatistics({
       totalGames: stats.totalGames,
       wins: stats.wins,
@@ -89,14 +94,11 @@ export default function ProfileScreen({navigation}: Props) {
       Alert.alert('Error', 'Nickname cannot be empty');
       return;
     }
-
     if (newNickname === nickname) {
       setIsEditing(false);
       return;
     }
-
     const result = await AuthService.updateNickname(newNickname);
-
     if (result.success) {
       Alert.alert('Success', 'Nickname updated successfully!');
       setNickname(newNickname);
@@ -116,20 +118,15 @@ export default function ProfileScreen({navigation}: Props) {
     setIsSigningIn(true);
     try {
       const result = await AuthService.signInWithGoogle();
-
       if (result.success) {
         Alert.alert('Success', 'Signed in with Google successfully!');
         loadProfile();
       } else if (result.conflict) {
-        // Account conflict - ask user what to do
         Alert.alert(
           'Account Conflict',
           result.message || 'This Google account is already linked to another player profile.',
           [
-            {
-              text: 'Cancel',
-              style: 'cancel',
-            },
+            {text: 'Cancel', style: 'cancel'},
             {
               text: 'Switch to that account',
               onPress: async () => {
@@ -147,13 +144,11 @@ export default function ProfileScreen({navigation}: Props) {
           ],
         );
       } else if (result.message) {
-        // Only show alert for actual errors, not cancellation
         if (result.message !== 'Sign-in cancelled.') {
           Alert.alert('Sign-In Failed', result.message);
         }
       }
     } catch (error) {
-      console.error('[ProfileScreen] Google Sign-In error:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     }
     setIsSigningIn(false);
@@ -164,10 +159,7 @@ export default function ProfileScreen({navigation}: Props) {
       'Sign Out',
       'Sign out? You can sign in again anytime.',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        {text: 'Cancel', style: 'cancel'},
         {
           text: 'Sign Out',
           style: 'destructive',
@@ -186,11 +178,9 @@ export default function ProfileScreen({navigation}: Props) {
 
   const getTimeSinceCreation = () => {
     if (!profile?.createdAt) return 'Unknown';
-
     const now = Date.now();
     const diff = now - profile.createdAt;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
     if (days === 0) return 'Today';
     if (days === 1) return 'Yesterday';
     return `${days} days ago`;
@@ -198,22 +188,18 @@ export default function ProfileScreen({navigation}: Props) {
 
   const canChangeNickname = () => {
     if (!profile?.nicknameChangedAt) return true;
-
     const now = Date.now();
     const diff = now - profile.nicknameChangedAt;
     const daysSinceChange = diff / (1000 * 60 * 60 * 24);
-
     return daysSinceChange >= 30;
   };
 
   const getDaysUntilNicknameChange = () => {
     if (!profile?.nicknameChangedAt) return 0;
-
     const now = Date.now();
     const diff = now - profile.nicknameChangedAt;
     const daysSinceChange = diff / (1000 * 60 * 60 * 24);
     const daysRemaining = Math.ceil(30 - daysSinceChange);
-
     return Math.max(0, daysRemaining);
   };
 
@@ -222,200 +208,201 @@ export default function ProfileScreen({navigation}: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Profile</Text>
-        </View>
+        <Animated.View style={{opacity: fadeAnim, transform: [{translateY: slideAnim}]}}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>PROFILE</Text>
+          </View>
 
-        {/* Avatar Section */}
-        <View style={styles.avatarContainer}>
-          {isGoogleUser && profile?.googlePhotoUrl ? (
-            <Image
-              source={{uri: profile.googlePhotoUrl}}
-              style={styles.avatarImage}
-            />
-          ) : (
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>✈️</Text>
+          {/* Avatar Section */}
+          <View style={styles.avatarContainer}>
+            {isGoogleUser && profile?.googlePhotoUrl ? (
+              <Image
+                source={{uri: profile.googlePhotoUrl}}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{'\u2708\uFE0F'}</Text>
+              </View>
+            )}
+            {isGoogleUser && profile?.googleEmail && (
+              <Text style={styles.emailText}>{profile.googleEmail}</Text>
+            )}
+          </View>
+
+          {/* Google Sign-In Section (for anonymous users) */}
+          {!isGoogleUser && (
+            <View style={styles.signInSection}>
+              <TouchableOpacity
+                style={[styles.googleButton, isSigningIn && styles.googleButtonDisabled]}
+                onPress={handleGoogleSignIn}
+                disabled={isSigningIn}>
+                {isSigningIn ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text style={styles.googleButtonIcon}>G</Text>
+                    <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <Text style={styles.signInHint}>
+                Save your progress across devices
+              </Text>
             </View>
           )}
-          {isGoogleUser && profile?.googleEmail && (
-            <Text style={styles.emailText}>{profile.googleEmail}</Text>
-          )}
-        </View>
 
-        {/* Google Sign-In Section (for anonymous users) */}
-        {!isGoogleUser && (
-          <View style={styles.signInSection}>
-            <TouchableOpacity
-              style={[styles.googleButton, isSigningIn && styles.googleButtonDisabled]}
-              onPress={handleGoogleSignIn}
-              disabled={isSigningIn}>
-              {isSigningIn ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Text style={styles.googleButtonIcon}>G</Text>
-                  <Text style={styles.googleButtonText}>Sign in with Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <Text style={styles.signInHint}>
-              Save your progress across devices
-            </Text>
-          </View>
-        )}
-
-        {/* Nickname Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nickname</Text>
-          {isEditing ? (
-            <View style={styles.editContainer}>
-              <TextInput
-                style={styles.input}
-                value={newNickname}
-                onChangeText={setNewNickname}
-                maxLength={20}
-                placeholder="Enter nickname"
-                placeholderTextColor="#666"
-              />
-              <View style={styles.editButtons}>
+          {/* Nickname Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>NICKNAME</Text>
+            {isEditing ? (
+              <View style={styles.editContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={newNickname}
+                  onChangeText={setNewNickname}
+                  maxLength={20}
+                  placeholder="Enter nickname"
+                  placeholderTextColor={colors.textDark}
+                />
+                <View style={styles.editButtons}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={handleCancelEdit}>
+                    <Text style={styles.cancelButtonText}>CANCEL</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={handleSaveNickname}>
+                    <Text style={styles.saveButtonText}>SAVE</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.nicknameContainer}>
+                <Text style={styles.nickname}>{nickname}</Text>
                 <TouchableOpacity
-                  style={[styles.editButton, styles.cancelButton]}
-                  onPress={handleCancelEdit}>
-                  <Text style={styles.editButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.editButton, styles.saveButton]}
-                  onPress={handleSaveNickname}>
-                  <Text style={styles.editButtonText}>Save</Text>
+                  style={styles.editIconButton}
+                  onPress={() => {
+                    if (canChangeNickname()) {
+                      setIsEditing(true);
+                    } else {
+                      Alert.alert(
+                        'Cannot Change Nickname',
+                        `You can change your nickname in ${getDaysUntilNicknameChange()} days.`,
+                      );
+                    }
+                  }}
+                  disabled={!canChangeNickname()}>
+                  <Text style={styles.editNicknameText}>Edit</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          ) : (
-            <View style={styles.nicknameContainer}>
-              <Text style={styles.nickname}>{nickname}</Text>
-              <TouchableOpacity
-                style={styles.editIconButton}
-                onPress={() => {
-                  if (canChangeNickname()) {
-                    setIsEditing(true);
-                  } else {
-                    Alert.alert(
-                      'Cannot Change Nickname',
-                      `You can change your nickname in ${getDaysUntilNicknameChange()} days.`,
-                    );
-                  }
-                }}
-                disabled={!canChangeNickname()}>
-                <Text style={styles.editIcon}>✏️</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          {!canChangeNickname() && (
-            <Text style={styles.cooldownText}>
-              Nickname can be changed in {getDaysUntilNicknameChange()} days
-            </Text>
-          )}
-        </View>
-
-        {/* Account Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Information</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Account Type:</Text>
-            <Text style={[styles.infoValue, isGoogleUser && styles.googleBadge]}>
-              {isGoogleUser ? 'Google' : 'Guest'}
-            </Text>
+            )}
+            {!canChangeNickname() && (
+              <Text style={styles.cooldownText}>
+                Nickname can be changed in {getDaysUntilNicknameChange()} days
+              </Text>
+            )}
           </View>
-          {isGoogleUser && profile?.googleDisplayName && (
+
+          {/* Account Info */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>ACCOUNT</Text>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Google Name:</Text>
-              <Text style={styles.infoValue}>{profile.googleDisplayName}</Text>
+              <Text style={styles.infoLabel}>Account Type</Text>
+              <Text style={[styles.infoValue, isGoogleUser && {color: '#4285F4'}]}>
+                {isGoogleUser ? 'Google' : 'Guest'}
+              </Text>
             </View>
+            <View style={styles.divider} />
+            {isGoogleUser && profile?.googleDisplayName && (
+              <>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Google Name</Text>
+                  <Text style={styles.infoValue}>{profile.googleDisplayName}</Text>
+                </View>
+                <View style={styles.divider} />
+              </>
+            )}
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Account Created</Text>
+              <Text style={styles.infoValue}>{getTimeSinceCreation()}</Text>
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>User ID</Text>
+              <Text style={styles.infoValue}>{profile?.userId?.slice(0, 12) || 'N/A'}...</Text>
+            </View>
+          </View>
+
+          {/* Statistics */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>STATISTICS</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{statistics.totalGames}</Text>
+                <Text style={styles.statLabel}>GAMES</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={[styles.statValue, {color: colors.success}]}>{statistics.wins}</Text>
+                <Text style={styles.statLabel}>WINS</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={[styles.statValue, {color: colors.danger}]}>{statistics.losses}</Text>
+                <Text style={styles.statLabel}>LOSSES</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={[styles.statValue, {color: colors.accent}]}>
+                  {(statistics.winRate || 0).toFixed(1)}%
+                </Text>
+                <Text style={styles.statLabel}>WIN RATE</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={loadStatistics}>
+              <Text style={styles.refreshButtonText}>REFRESH STATISTICS</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Quick Actions */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>QUICK ACTIONS</Text>
+            {[
+              {label: 'Achievements', nav: 'Achievements' as const},
+              {label: 'Customize Skins', nav: 'Skins' as const},
+              {label: 'View Leaderboard', nav: 'Leaderboard' as const},
+              {label: 'Game History', nav: 'GameHistory' as const},
+            ].map((item, idx) => (
+              <React.Fragment key={item.nav}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => navigation.navigate(item.nav)}>
+                  <Text style={styles.actionButtonText}>{item.label}</Text>
+                  <Text style={styles.actionButtonArrow}>{'>'}</Text>
+                </TouchableOpacity>
+                {idx < 3 && <View style={styles.divider} />}
+              </React.Fragment>
+            ))}
+          </View>
+
+          {/* Sign Out Button */}
+          {isGoogleUser && (
+            <TouchableOpacity
+              style={styles.signOutButton}
+              onPress={handleSignOut}>
+              <Text style={styles.signOutButtonText}>SIGN OUT</Text>
+            </TouchableOpacity>
           )}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Account Created:</Text>
-            <Text style={styles.infoValue}>{getTimeSinceCreation()}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>User ID:</Text>
-            <Text style={styles.infoValue}>{profile?.userId?.slice(0, 12) || 'N/A'}...</Text>
-          </View>
-        </View>
 
-        {/* Statistics */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Statistics</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statBox}>
-              <Text style={styles.statValue}>{statistics.totalGames}</Text>
-              <Text style={styles.statLabel}>Games Played</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={[styles.statValue, styles.statWins]}>{statistics.wins}</Text>
-              <Text style={styles.statLabel}>Wins</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={[styles.statValue, styles.statLosses]}>{statistics.losses}</Text>
-              <Text style={styles.statLabel}>Losses</Text>
-            </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statValue}>{(statistics.winRate || 0).toFixed(1)}%</Text>
-              <Text style={styles.statLabel}>Win Rate</Text>
-            </View>
-          </View>
+          {/* Back Button */}
           <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={loadStatistics}>
-            <Text style={styles.refreshButtonText}>Refresh Statistics</Text>
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>BACK TO MENU</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Achievements')}>
-            <Text style={styles.actionButtonText}>Achievements</Text>
-            <Text style={styles.actionButtonArrow}>></Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Skins')}>
-            <Text style={styles.actionButtonText}>Customize Skins</Text>
-            <Text style={styles.actionButtonArrow}>></Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Leaderboard')}>
-            <Text style={styles.actionButtonText}>View Leaderboard</Text>
-            <Text style={styles.actionButtonArrow}>></Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('GameHistory')}>
-            <Text style={styles.actionButtonText}>Game History</Text>
-            <Text style={styles.actionButtonArrow}>></Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Sign Out Button (only for Google users) */}
-        {isGoogleUser && (
-          <TouchableOpacity
-            style={styles.signOutButton}
-            onPress={handleSignOut}>
-            <Text style={styles.signOutButtonText}>Sign Out</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Back Button */}
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Back to Menu</Text>
-        </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
       {AdService.shouldShowBannerAd() && (
         <View style={styles.bannerContainer}>
@@ -433,7 +420,7 @@ export default function ProfileScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   content: {
     flex: 1,
@@ -446,37 +433,43 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 20,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
   avatarContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 24,
   },
   avatar: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#0f3460',
+    backgroundColor: colors.accentDim,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: colors.accentGlow,
+    shadowColor: colors.accent,
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
   },
   avatarImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: colors.accentGlow,
   },
   avatarText: {
     fontSize: 48,
   },
   emailText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
     marginTop: 8,
   },
   signInSection: {
@@ -487,10 +480,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4285F4',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 12,
     width: '100%',
     maxWidth: 300,
   },
@@ -511,26 +506,33 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   googleButtonText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    color: colors.textPrimary,
   },
   signInHint: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 12,
-    color: '#888',
+    color: colors.textMuted,
     marginTop: 8,
   },
   section: {
-    backgroundColor: '#16213e',
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
+    borderRadius: 14,
     padding: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginBottom: 15,
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    letterSpacing: 2,
+    paddingLeft: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    marginBottom: 16,
   },
   nicknameContainer: {
     flexDirection: 'row',
@@ -538,54 +540,69 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   nickname: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 22,
+    color: colors.textPrimary,
     flex: 1,
   },
   editIconButton: {
     padding: 10,
   },
-  editIcon: {
-    fontSize: 24,
+  editNicknameText: {
+    fontFamily: fonts.rajdhaniSemiBold,
+    fontSize: 14,
+    color: colors.accent,
   },
   editContainer: {
     width: '100%',
   },
   input: {
-    backgroundColor: '#0f3460',
-    color: '#fff',
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
+    color: colors.textPrimary,
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 18,
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: colors.accentBorder,
   },
   editButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  editButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 5,
+    gap: 10,
   },
   cancelButton: {
-    backgroundColor: '#607D8B',
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cancelButtonText: {
+    fontFamily: fonts.orbitronBold,
+    color: colors.textSecondary,
+    fontSize: 12,
+    letterSpacing: 1,
   },
   saveButton: {
-    backgroundColor: '#4CAF50',
+    flex: 1,
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: colors.accent,
   },
-  editButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  saveButtonText: {
+    fontFamily: fonts.orbitronBold,
+    color: colors.textPrimary,
+    fontSize: 12,
+    letterSpacing: 1,
   },
   cooldownText: {
-    color: '#FF9800',
+    fontFamily: fonts.rajdhaniRegular,
+    color: colors.warning,
     fontSize: 12,
     marginTop: 10,
   },
@@ -593,20 +610,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
   },
   infoLabel: {
-    fontSize: 14,
-    color: '#aaa',
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 15,
+    color: colors.textMuted,
   },
   infoValue: {
-    fontSize: 14,
-    color: '#fff',
-    fontWeight: '600',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.textPrimary,
   },
-  googleBadge: {
-    color: '#4285F4',
+  divider: {
+    height: 1,
+    backgroundColor: colors.divider,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -615,85 +632,90 @@ const styles = StyleSheet.create({
   },
   statBox: {
     width: '48%',
-    backgroundColor: '#0f3460',
-    borderRadius: 8,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 12,
     padding: 15,
     alignItems: 'center',
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.1)',
   },
   statValue: {
+    fontFamily: fonts.orbitronExtraBold,
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    color: colors.accent,
     marginBottom: 5,
   },
-  statWins: {
-    color: '#4CAF50',
-  },
-  statLosses: {
-    color: '#F44336',
-  },
   statLabel: {
-    fontSize: 12,
-    color: '#aaa',
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 11,
+    color: colors.textMuted,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   refreshButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
-    marginTop: 15,
+    marginTop: 12,
   },
   refreshButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.accent,
+    fontSize: 12,
+    letterSpacing: 1,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0f3460',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    paddingVertical: 14,
   },
   actionButtonText: {
     flex: 1,
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
+    color: colors.textPrimary,
   },
   actionButtonArrow: {
-    fontSize: 24,
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 18,
+    color: colors.accent,
   },
   signOutButton: {
-    backgroundColor: '#D32F2F',
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 10,
   },
   signOutButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.danger,
+    fontSize: 13,
+    letterSpacing: 2,
   },
   backButton: {
-    backgroundColor: '#607D8B',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 6,
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textSecondary,
+    fontSize: 13,
+    letterSpacing: 2,
   },
   bannerContainer: {
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
 });

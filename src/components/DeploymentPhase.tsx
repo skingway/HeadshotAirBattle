@@ -18,6 +18,7 @@ import Airplane from '../core/Airplane';
 import DraggableAirplane from './DraggableAirplane';
 import SkinService from '../services/SkinService';
 import {useOrientation} from '../hooks/useOrientation';
+import {colors, fonts} from '../theme/colors';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
@@ -293,11 +294,11 @@ export default function DeploymentPhase({
     }
     // 预览位置
     else if (isPreview) {
-      backgroundColor = previewValid ? 'rgba(76, 175, 80, 0.5)' : 'rgba(244, 67, 54, 0.5)';
+      backgroundColor = previewValid ? 'rgba(0, 212, 255, 0.4)' : 'rgba(244, 67, 54, 0.4)';
       if (!previewValid) {
-        cellStyle.push({borderColor: '#F44336', borderWidth: 2});
+        cellStyle.push({borderColor: colors.danger, borderWidth: 2});
       } else {
-        cellStyle.push({borderColor: '#4CAF50', borderWidth: 2});
+        cellStyle.push({borderColor: colors.accent, borderWidth: 2});
       }
 
       if (previewCellType === 'head') {
@@ -335,7 +336,7 @@ export default function DeploymentPhase({
             width: 10,
             height: 10,
             borderRadius: 5,
-            backgroundColor: isBoardReadyRef.current ? '#4CAF50' : '#FF9800',
+            backgroundColor: isBoardReadyRef.current ? colors.accent : colors.warning,
           }} />
         </View>
         <View
@@ -439,21 +440,25 @@ export default function DeploymentPhase({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   header: {
     padding: 15,
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 18,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
   subtitle: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#4CAF50',
+    color: colors.accent,
     marginTop: 5,
   },
   content: {
@@ -467,38 +472,44 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   boardTitle: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 10,
   },
   board: {
-    backgroundColor: '#0f3460',
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
     borderWidth: 2,
-    borderColor: '#16213e',
+    borderColor: colors.accentBorder,
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
   },
   cell: {
-    borderWidth: 1,
-    borderColor: '#16213e',
+    borderWidth: 0.5,
+    borderColor: 'rgba(0, 212, 255, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cellText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: 12,
   },
   templatesContainer: {
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 14,
     marginBottom: 20,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   templatesTitle: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 15,
   },
   rotationContainer: {
@@ -509,80 +520,90 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   rotateButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     minWidth: 100,
     alignItems: 'center',
   },
   rotateButtonText: {
-    color: '#fff',
+    fontFamily: fonts.rajdhaniSemiBold,
+    color: colors.accent,
     fontSize: 14,
-    fontWeight: 'bold',
   },
   airplanePreview: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   directionIndicator: {
+    fontFamily: fonts.orbitronBold,
     fontSize: 24,
-    color: '#FFD700',
+    color: colors.gold,
     marginTop: 5,
-    fontWeight: 'bold',
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 20,
+    gap: 10,
   },
   clearButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     flex: 1,
-    marginRight: 10,
     alignItems: 'center',
   },
   clearButtonText: {
-    color: '#fff',
+    fontFamily: fonts.rajdhaniSemiBold,
+    color: colors.danger,
     fontSize: 16,
-    fontWeight: 'bold',
   },
   autoButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: 'rgba(255, 152, 0, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 152, 0, 0.3)',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     flex: 1,
     alignItems: 'center',
   },
   autoButtonText: {
-    color: '#fff',
+    fontFamily: fonts.rajdhaniSemiBold,
+    color: colors.warning,
     fontSize: 16,
-    fontWeight: 'bold',
   },
   startButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.accent,
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 10,
   },
   startButtonDisabled: {
-    backgroundColor: '#666',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   startButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textPrimary,
+    fontSize: 14,
+    letterSpacing: 2,
   },
   cancelButton: {
-    backgroundColor: '#666',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
   },
   cancelButtonText: {
-    color: '#fff',
+    fontFamily: fonts.rajdhaniSemiBold,
+    color: colors.textSecondary,
     fontSize: 16,
   },
 });

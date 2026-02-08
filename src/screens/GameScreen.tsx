@@ -26,6 +26,7 @@ import AuthService from '../services/AuthService';
 import {AchievementService} from '../services/AchievementService';
 import AdService from '../services/AdService';
 import {useOrientation} from '../hooks/useOrientation';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -731,7 +732,7 @@ export default function GameScreen({navigation, route}: Props) {
   if (phase === 'deployment') {
     return (
       <>
-        <StatusBar hidden={false} backgroundColor="#16213e" barStyle="light-content" />
+        <StatusBar hidden={false} backgroundColor={colors.bgPrimary} barStyle="light-content" />
         <DeploymentPhase
           boardSize={boardSize}
           airplaneCount={airplaneCount}
@@ -746,7 +747,7 @@ export default function GameScreen({navigation, route}: Props) {
   if (phase === 'countdown') {
     return (
       <>
-        <StatusBar hidden={false} backgroundColor="#16213e" barStyle="light-content" />
+        <StatusBar hidden={false} backgroundColor={colors.bgPrimary} barStyle="light-content" />
         <CountdownScreen onComplete={handleCountdownComplete} />
       </>
     );
@@ -755,7 +756,7 @@ export default function GameScreen({navigation, route}: Props) {
   // Show battle/gameover phase
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar hidden={isFullscreen} backgroundColor="#16213e" barStyle="light-content" />
+      <StatusBar hidden={isFullscreen} backgroundColor={colors.bgPrimary} barStyle="light-content" />
       <View style={[styles.header, isLandscape && styles.headerLandscape]}>
         {!isLandscape && (
           <Text style={styles.title}>Headshot: Air Battle</Text>
@@ -863,13 +864,15 @@ export default function GameScreen({navigation, route}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   header: {
     padding: 8,
     paddingVertical: 10,
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
   },
   headerLandscape: {
     padding: 4,
@@ -879,13 +882,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 18,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
   difficulty: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 14,
-    color: '#4CAF50',
+    color: colors.accent,
     marginTop: 3,
   },
   difficultyLandscape: {
@@ -894,10 +899,11 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
   turnIndicator: {
-    fontSize: 16,
-    color: '#FFD700',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 14,
+    color: colors.gold,
     marginTop: 6,
-    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   turnIndicatorLandscape: {
     fontSize: 12,
@@ -908,8 +914,10 @@ const styles = StyleSheet.create({
     marginTop: 5,
     paddingHorizontal: 20,
     paddingVertical: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 212, 255, 0.06)',
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   timerContainerLandscape: {
     marginTop: 0,
@@ -918,15 +926,15 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   timerText: {
-    fontSize: 18,
-    color: '#4CAF50',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 16,
+    color: colors.accent,
   },
   timerTextLandscape: {
     fontSize: 11,
   },
   timerWarning: {
-    color: '#FF5722',
+    color: colors.danger,
   },
   statsRow: {
     flexDirection: 'row',
@@ -942,18 +950,21 @@ const styles = StyleSheet.create({
   },
   statBox: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(0, 212, 255, 0.06)',
     padding: 8,
-    borderRadius: 5,
+    borderRadius: 8,
     minWidth: 80,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.12)',
   },
   statBoxLandscape: {
     padding: 3,
     minWidth: 50,
   },
   statLabel: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 10,
-    color: '#aaa',
+    color: colors.textMuted,
     marginBottom: 3,
   },
   statLabelLandscape: {
@@ -961,9 +972,9 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   statValue: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 13,
+    color: colors.accent,
   },
   statValueLandscape: {
     fontSize: 10,
@@ -972,9 +983,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     padding: 8,
-    borderRadius: 5,
+    borderRadius: 8,
     width: 36,
     height: 36,
     justifyContent: 'center',
@@ -989,7 +1000,7 @@ const styles = StyleSheet.create({
   },
   fullscreenButtonText: {
     fontSize: 20,
-    color: '#fff',
+    color: colors.textPrimary,
   },
   fullscreenButtonTextLandscape: {
     fontSize: 16,
@@ -1005,13 +1016,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   boardTitle: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textPrimary,
     marginBottom: 10,
-    fontWeight: 'bold',
   },
   board: {
-    backgroundColor: '#0f3460',
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
     padding: 2,
     borderRadius: 5,
   },
@@ -1022,25 +1033,25 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     margin: 1,
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 20, 40, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 2,
   },
   cellAirplane: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'rgba(0, 212, 255, 0.25)',
   },
   cellMiss: {
-    backgroundColor: '#546e7a',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   cellHit: {
-    backgroundColor: '#FF9800',
+    backgroundColor: 'rgba(255, 152, 0, 0.6)',
   },
   cellKilled: {
-    backgroundColor: '#F44336',
+    backgroundColor: 'rgba(255, 40, 40, 0.7)',
   },
   cellText: {
-    color: '#fff',
+    color: colors.textPrimary,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -1055,84 +1066,96 @@ const styles = StyleSheet.create({
     minHeight: 500,
   },
   logContainer: {
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
     padding: 10,
     margin: 10,
-    borderRadius: 10,
+    borderRadius: 12,
     maxHeight: 120,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   logScroll: {
     maxHeight: 80,
   },
   logTitle: {
-    fontSize: 16,
-    color: '#FFD700',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.gold,
     marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   logText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 13,
-    color: '#e0e0e0',
-    marginBottom: 8,
+    color: colors.textSecondary,
+    marginBottom: 6,
     paddingVertical: 4,
     paddingHorizontal: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: 4,
     borderLeftWidth: 3,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: colors.accent,
   },
   gameoverContainer: {
     marginTop: 20,
     padding: 20,
-    backgroundColor: '#16213e',
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 14,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   gameoverText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 24,
+    color: colors.textPrimary,
     marginBottom: 20,
+    letterSpacing: 2,
   },
   playAgainButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.accent,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     width: '100%',
     alignItems: 'center',
     marginBottom: 10,
   },
   playAgainText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textPrimary,
+    fontSize: 14,
+    letterSpacing: 2,
   },
   menuButton: {
-    backgroundColor: '#546e7a',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     width: '100%',
     alignItems: 'center',
   },
   menuButtonText: {
-    color: '#fff',
+    fontFamily: fonts.rajdhaniSemiBold,
+    color: colors.textSecondary,
     fontSize: 16,
   },
   surrenderButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: colors.dangerDim,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
     marginHorizontal: 10,
     marginTop: 20,
     marginBottom: 30,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#D32F2F',
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
   },
   surrenderButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.danger,
+    fontSize: 13,
+    letterSpacing: 1,
   },
 });

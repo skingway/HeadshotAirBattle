@@ -16,6 +16,7 @@ import {
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Slider from '@react-native-community/slider';
 import GameConstants from '../config/GameConstants';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -106,9 +107,9 @@ export default function CustomModeScreen({navigation}: Props) {
             maximumValue={customMode.maxBoardSize}
             value={boardSize}
             onValueChange={handleBoardSizeChange}
-            minimumTrackTintColor="#2196F3"
-            maximumTrackTintColor="#555"
-            thumbTintColor="#2196F3"
+            minimumTrackTintColor={colors.accent}
+            maximumTrackTintColor="rgba(255,255,255,0.15)"
+            thumbTintColor={colors.accent}
             step={1}
           />
           <View style={styles.sliderLabels}>
@@ -127,9 +128,9 @@ export default function CustomModeScreen({navigation}: Props) {
             maximumValue={customMode.maxAirplanes}
             value={airplaneCount}
             onValueChange={handleAirplaneCountChange}
-            minimumTrackTintColor="#4CAF50"
-            maximumTrackTintColor="#555"
-            thumbTintColor="#4CAF50"
+            minimumTrackTintColor={colors.accent}
+            maximumTrackTintColor="rgba(255,255,255,0.15)"
+            thumbTintColor={colors.accent}
             step={1}
           />
           <View style={styles.sliderLabels}>
@@ -213,7 +214,7 @@ export default function CustomModeScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   scrollView: {
     flex: 1,
@@ -224,34 +225,39 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 22,
+    color: colors.textPrimary,
     marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: 2,
   },
   subtitle: {
-    fontSize: 18,
-    color: '#aaa',
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 16,
+    color: colors.textMuted,
     marginBottom: 30,
     textAlign: 'center',
   },
   configSection: {
-    marginBottom: 30,
-    backgroundColor: '#16213e',
-    borderRadius: 10,
+    marginBottom: 24,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 14,
     padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 14,
+    color: colors.accent,
     marginBottom: 10,
+    letterSpacing: 1,
   },
   valueDisplay: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronExtraBold,
+    fontSize: 22,
+    color: colors.textPrimary,
     marginBottom: 15,
     textAlign: 'center',
   },
@@ -265,79 +271,93 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   sliderLabel: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 12,
-    color: '#999',
+    color: colors.textMuted,
   },
   infoSection: {
-    backgroundColor: '#16213e',
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 14,
     padding: 15,
-    marginBottom: 30,
+    marginBottom: 24,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   infoText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
+    color: colors.textPrimary,
     marginBottom: 5,
   },
   infoSubtext: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#aaa',
+    color: colors.textMuted,
   },
   difficultySection: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   difficultyButton: {
     width: '100%',
     padding: 15,
-    borderRadius: 10,
-    marginVertical: 8,
+    borderRadius: 12,
+    marginVertical: 6,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
   selectedButton: {
-    borderColor: '#FFD700',
+    borderColor: colors.gold,
   },
   easyButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'rgba(76, 175, 80, 0.3)',
+    borderColor: 'rgba(76, 175, 80, 0.5)',
+    borderWidth: 1,
   },
   mediumButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: 'rgba(255, 152, 0, 0.3)',
+    borderColor: 'rgba(255, 152, 0, 0.5)',
+    borderWidth: 1,
   },
   hardButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: 'rgba(244, 67, 54, 0.3)',
+    borderColor: 'rgba(244, 67, 54, 0.5)',
+    borderWidth: 1,
   },
   difficultyButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    letterSpacing: 1,
   },
   difficultyButtonSubtext: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#fff',
-    opacity: 0.8,
+    color: colors.textSecondary,
     marginTop: 3,
   },
   actionButtons: {
-    gap: 15,
+    gap: 12,
   },
   actionButton: {
     width: '100%',
     padding: 18,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
   startButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: colors.accent,
   },
   cancelButton: {
-    backgroundColor: '#607D8B',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   actionButtonText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 16,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
 });

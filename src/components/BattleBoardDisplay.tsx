@@ -6,6 +6,7 @@
 
 import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
+import {colors, fonts} from '../theme/colors';
 
 interface AirplaneData {
   id: string;
@@ -263,23 +264,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.textPrimary,
     marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   noData: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#95a5a6',
+    color: colors.textMuted,
     textAlign: 'center',
     fontStyle: 'italic',
   },
   board: {
     alignSelf: 'center',
     borderWidth: 2,
-    borderColor: '#34495e',
-    backgroundColor: '#ecf0f1',
+    borderColor: colors.accentBorder,
+    backgroundColor: 'rgba(0, 30, 60, 0.6)',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
@@ -288,27 +293,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 0.5,
-    borderColor: '#bdc3c7',
+    borderColor: 'rgba(0, 212, 255, 0.12)',
   },
   cellEmpty: {
-    backgroundColor: '#ecf0f1',
+    backgroundColor: 'rgba(0, 20, 40, 0.5)',
   },
   cellAirplane: {
-    backgroundColor: '#3498db',
+    backgroundColor: 'rgba(0, 212, 255, 0.25)',
   },
   cellHit: {
-    backgroundColor: '#e74c3c',
+    backgroundColor: 'rgba(255, 77, 77, 0.5)',
   },
   cellKilled: {
-    backgroundColor: '#c0392b',
+    backgroundColor: 'rgba(255, 40, 40, 0.7)',
   },
   cellMiss: {
-    backgroundColor: '#95a5a6',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   cellText: {
     textAlign: 'center',
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.textPrimary,
   },
   attackMarker: {
     position: 'absolute',
@@ -320,7 +325,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   legendText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 12,
-    color: '#7f8c8d',
+    color: colors.textMuted,
   },
 });

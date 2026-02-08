@@ -18,6 +18,7 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import StatisticsService from '../services/StatisticsService';
 import AuthService from '../services/AuthService';
 import FirebaseService from '../services/FirebaseService';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -100,10 +101,10 @@ export default function LeaderboardScreen({navigation}: Props) {
   };
 
   const getRankColor = (rank: number): string => {
-    if (rank === 1) return '#FFD700'; // Gold
-    if (rank === 2) return '#C0C0C0'; // Silver
-    if (rank === 3) return '#CD7F32'; // Bronze
-    return '#fff';
+    if (rank === 1) return colors.gold;
+    if (rank === 2) return '#C0C0C0';
+    if (rank === 3) return '#CD7F32';
+    return colors.textPrimary;
   };
 
   const getRankEmoji = (rank: number): string => {
@@ -117,7 +118,7 @@ export default function LeaderboardScreen({navigation}: Props) {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>🏆 Leaderboard</Text>
+        <Text style={styles.title}>LEADERBOARD</Text>
         {!isOffline && userRank > 0 && (
           <Text style={styles.userRank}>Your Rank: #{userRank}</Text>
         )}
@@ -156,12 +157,12 @@ export default function LeaderboardScreen({navigation}: Props) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#4CAF50"
+            tintColor={colors.accent}
           />
         }>
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
+            <ActivityIndicator size="large" color={colors.accent} />
             <Text style={styles.loadingText}>Loading leaderboard...</Text>
           </View>
         ) : isOffline ? (
@@ -241,47 +242,53 @@ export default function LeaderboardScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   header: {
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 2,
-    borderBottomColor: '#4CAF50',
+    borderBottomColor: colors.accentBorder,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 22,
+    color: colors.textPrimary,
+    letterSpacing: 3,
     marginBottom: 8,
   },
   userRank: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 13,
+    color: colors.accent,
+    letterSpacing: 1,
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#16213e',
     paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 6,
   },
   tab: {
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   activeTab: {
-    borderBottomColor: '#4CAF50',
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accentBorder,
   },
   tabText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 14,
-    color: '#999',
-    fontWeight: '600',
+    color: colors.textMuted,
   },
   activeTabText: {
-    color: '#4CAF50',
+    color: colors.accent,
   },
   content: {
     flex: 1,
@@ -296,9 +303,10 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   loadingText: {
+    fontFamily: fonts.rajdhaniRegular,
     marginTop: 16,
     fontSize: 16,
-    color: '#999',
+    color: colors.textMuted,
   },
   offlineContainer: {
     flex: 1,
@@ -311,14 +319,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   offlineTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 18,
+    color: colors.textPrimary,
     marginBottom: 10,
+    letterSpacing: 1,
   },
   offlineText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#999',
+    color: colors.textMuted,
     textAlign: 'center',
     marginBottom: 5,
   },
@@ -333,38 +343,44 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   emptyText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 16,
-    color: '#999',
+    color: colors.textMuted,
   },
   listContainer: {
-    padding: 10,
+    padding: 12,
   },
   headerRow: {
     flexDirection: 'row',
     paddingVertical: 12,
-    paddingHorizontal: 10,
-    backgroundColor: '#0f3460',
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0, 212, 255, 0.08)',
+    borderRadius: 10,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   headerCell: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 10,
+    color: colors.accent,
+    letterSpacing: 1,
   },
   playerRow: {
     flexDirection: 'row',
     paddingVertical: 12,
-    paddingHorizontal: 10,
-    backgroundColor: '#16213e',
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0, 30, 60, 0.3)',
+    borderRadius: 10,
     marginBottom: 8,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   currentUserRow: {
-    backgroundColor: '#0f3460',
+    backgroundColor: 'rgba(0, 212, 255, 0.08)',
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: colors.accent,
   },
   rankCell: {
     width: 70,
@@ -380,36 +396,40 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   rankText: {
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 13,
   },
   nicknameText: {
-    fontSize: 14,
-    color: '#fff',
-    fontWeight: '600',
+    fontFamily: fonts.rajdhaniSemiBold,
+    fontSize: 15,
+    color: colors.textPrimary,
   },
   currentUserText: {
-    color: '#4CAF50',
+    color: colors.accent,
   },
   wlText: {
-    fontSize: 12,
-    color: '#999',
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 13,
+    color: colors.textMuted,
   },
   valueText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronExtraBold,
+    fontSize: 15,
+    color: colors.textPrimary,
   },
   backButton: {
-    backgroundColor: '#607D8B',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 15,
     margin: 20,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textSecondary,
+    fontSize: 13,
+    letterSpacing: 2,
   },
 });

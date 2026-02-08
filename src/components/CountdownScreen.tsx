@@ -5,6 +5,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {View, Text, StyleSheet, Animated} from 'react-native';
+import {colors, fonts} from '../theme/colors';
 
 interface CountdownScreenProps {
   onComplete: () => void;
@@ -67,32 +68,34 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 26,
+    color: colors.textPrimary,
     marginBottom: 40,
+    letterSpacing: 3,
   },
   countdownCircle: {
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: '#2196F3',
+    backgroundColor: 'rgba(0, 212, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 4,
-    borderColor: '#4CAF50',
+    borderColor: colors.accent,
   },
   countdownText: {
-    fontSize: 80,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronExtraBold,
+    fontSize: 72,
+    color: colors.accent,
   },
   subtitle: {
-    fontSize: 20,
-    color: '#aaa',
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 18,
+    color: colors.textMuted,
     marginTop: 40,
   },
 });

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,15 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ScrollView,
+  Animated,
+  Easing,
+  Pressable,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {BannerAd, BannerAdSize} from 'react-native-google-mobile-ads';
 import AdService from '../services/AdService';
 import {AD_UNIT_IDS} from '../config/AdConfig';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -26,8 +30,61 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'MainMenu'>;
 };
 
+function AnimatedButton({
+  onPress,
+  style,
+  children,
+}: {
+  onPress: () => void;
+  style: any;
+  children: React.ReactNode;
+}) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  return (
+    <Pressable
+      onPressIn={() => {
+        Animated.spring(scaleAnim, {toValue: 0.97, useNativeDriver: true}).start();
+      }}
+      onPressOut={() => {
+        Animated.spring(scaleAnim, {toValue: 1, useNativeDriver: true}).start();
+      }}
+      onPress={onPress}>
+      <Animated.View style={[style, {transform: [{scale: scaleAnim}]}]}>
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function MainMenuScreen({navigation}: Props) {
   const [selectedMode, setSelectedMode] = useState<string | null>(null);
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -8,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {toValue: 1, duration: 400, useNativeDriver: true}),
+      Animated.timing(slideAnim, {toValue: 0, duration: 400, useNativeDriver: true}),
+    ]).start();
+  }, []);
 
   const startGame = (difficulty: string) => {
     if (selectedMode === 'standard') {
@@ -39,10 +96,8 @@ export default function MainMenuScreen({navigation}: Props) {
 
   const handleModeSelect = (mode: string) => {
     if (mode === 'custom') {
-      // Navigate to custom mode configuration screen
       navigation.navigate('CustomMode');
     } else {
-      // Set mode and show difficulty selection
       setSelectedMode(mode);
     }
   };
@@ -54,105 +109,105 @@ export default function MainMenuScreen({navigation}: Props) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Headshot: Air Battle</Text>
+        <Animated.View style={{opacity: fadeAnim, transform: [{translateY: slideAnim}], width: '100%', alignItems: 'center'}}>
+          {/* Logo Area */}
+          <View style={styles.logoArea}>
+            <Animated.Text
+              style={[styles.logoPlane, {transform: [{translateY: floatAnim}]}]}>
+              {'✈️'}
+            </Animated.Text>
+            <Text style={styles.title}>HEADSHOT</Text>
+            <Text style={styles.titleSub}>AIR BATTLE</Text>
+          </View>
 
-        {!selectedMode ? (
-          // Mode Selection Screen
-          <>
-            <Text style={styles.subtitle}>Choose Game Mode</Text>
+          {!selectedMode ? (
+            <>
+              <Text style={styles.subtitle}>CHOOSE GAME MODE</Text>
 
-            <TouchableOpacity
-              style={[styles.button, styles.standardButton]}
-              onPress={() => handleModeSelect('standard')}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>Standard Mode</Text>
-              <Text style={styles.buttonSubtext}>10×10 · 3 Airplanes</Text>
-            </TouchableOpacity>
+              <AnimatedButton
+                style={[styles.button, styles.btnPrimary]}
+                onPress={() => handleModeSelect('standard')}>
+                <Text style={styles.btnPrimaryText}>STANDARD MODE</Text>
+                <Text style={styles.buttonSubtext}>10x10 -- 3 Airplanes</Text>
+              </AnimatedButton>
 
-            <TouchableOpacity
-              style={[styles.button, styles.extendedButton]}
-              onPress={() => handleModeSelect('extended')}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>Extended Mode</Text>
-              <Text style={styles.buttonSubtext}>15×15 · 6 Airplanes</Text>
-            </TouchableOpacity>
+              <AnimatedButton
+                style={[styles.button, styles.btnSecondary]}
+                onPress={() => handleModeSelect('extended')}>
+                <Text style={styles.btnSecondaryText}>EXTENDED MODE</Text>
+                <Text style={[styles.buttonSubtext, {color: colors.accent}]}>15x15 -- 6 Airplanes</Text>
+              </AnimatedButton>
 
-            <TouchableOpacity
-              style={[styles.button, styles.customButton]}
-              onPress={() => handleModeSelect('custom')}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>Custom Mode</Text>
-              <Text style={styles.buttonSubtext}>Custom Size · Custom Count</Text>
-            </TouchableOpacity>
+              <AnimatedButton
+                style={[styles.button, styles.btnTertiary]}
+                onPress={() => handleModeSelect('custom')}>
+                <Text style={styles.btnTertiaryText}>CUSTOM MODE</Text>
+                <Text style={styles.buttonSubtext}>Custom Size -- Custom Count</Text>
+              </AnimatedButton>
 
-            <TouchableOpacity
-              style={[styles.button, styles.onlineButton]}
-              onPress={() => navigation.navigate('OnlineMode')}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>🌐 Online Multiplayer</Text>
-              <Text style={styles.buttonSubtext}>Play with real players</Text>
-            </TouchableOpacity>
+              <AnimatedButton
+                style={[styles.button, styles.btnSecondary]}
+                onPress={() => navigation.navigate('OnlineMode')}>
+                <Text style={styles.btnSecondaryText}>ONLINE MULTIPLAYER</Text>
+                <Text style={[styles.buttonSubtext, {color: colors.accent}]}>Play with real players</Text>
+              </AnimatedButton>
 
-            <View style={styles.bottomButtons}>
-              <TouchableOpacity
-                style={[styles.smallButton, styles.profileButton]}
-                onPress={() => navigation.navigate('Profile')}>
-                <Text style={styles.smallButtonText}>Profile</Text>
-              </TouchableOpacity>
+              <View style={styles.bottomButtons}>
+                <AnimatedButton
+                  style={styles.smallButton}
+                  onPress={() => navigation.navigate('Profile')}>
+                  <Text style={styles.smallButtonText}>PROFILE</Text>
+                </AnimatedButton>
 
-              <TouchableOpacity
-                style={[styles.smallButton, styles.shopButton]}
-                onPress={() => navigation.navigate('Store')}>
-                <Text style={styles.smallButtonText}>Shop</Text>
-              </TouchableOpacity>
+                <AnimatedButton
+                  style={[styles.smallButton, styles.smallButtonGold]}
+                  onPress={() => navigation.navigate('Store')}>
+                  <Text style={[styles.smallButtonText, {color: colors.gold}]}>SHOP</Text>
+                </AnimatedButton>
 
-              <TouchableOpacity
-                style={[styles.smallButton, styles.settingsButton]}
-                onPress={() => navigation.navigate('Settings')}>
-                <Text style={styles.smallButtonText}>Settings</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          // Difficulty Selection Screen
-          <>
-            <Text style={styles.subtitle}>
-              {selectedMode === 'standard' ? 'Standard Mode (10×10)' : 'Extended Mode (15×15)'}
-            </Text>
-            <Text style={styles.modeHint}>Choose AI Difficulty</Text>
+                <AnimatedButton
+                  style={styles.smallButton}
+                  onPress={() => navigation.navigate('Settings')}>
+                  <Text style={styles.smallButtonText}>SETTINGS</Text>
+                </AnimatedButton>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.subtitle}>
+                {selectedMode === 'standard' ? 'STANDARD MODE (10x10)' : 'EXTENDED MODE (15x15)'}
+              </Text>
+              <Text style={styles.modeHint}>Choose AI Difficulty</Text>
 
-            <TouchableOpacity
-              style={[styles.button, styles.easyButton]}
-              onPress={() => startGame('easy')}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>Easy AI</Text>
-              <Text style={styles.buttonSubtext}>Random attacks</Text>
-            </TouchableOpacity>
+              <AnimatedButton
+                style={[styles.button, styles.btnPrimary]}
+                onPress={() => startGame('easy')}>
+                <Text style={styles.btnPrimaryText}>EASY AI</Text>
+                <Text style={styles.buttonSubtext}>Random attacks</Text>
+              </AnimatedButton>
 
-            <TouchableOpacity
-              style={[styles.button, styles.mediumButton]}
-              onPress={() => startGame('medium')}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>Medium AI</Text>
-              <Text style={styles.buttonSubtext}>Smart tracking</Text>
-            </TouchableOpacity>
+              <AnimatedButton
+                style={[styles.button, styles.btnSecondary]}
+                onPress={() => startGame('medium')}>
+                <Text style={styles.btnSecondaryText}>MEDIUM AI</Text>
+                <Text style={[styles.buttonSubtext, {color: colors.accent}]}>Smart tracking</Text>
+              </AnimatedButton>
 
-            <TouchableOpacity
-              style={[styles.button, styles.hardButton]}
-              onPress={() => startGame('hard')}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>Hard AI (Ultra V2)</Text>
-              <Text style={styles.buttonSubtext}>Lock Head Algorithm</Text>
-            </TouchableOpacity>
+              <AnimatedButton
+                style={[styles.button, styles.btnDanger]}
+                onPress={() => startGame('hard')}>
+                <Text style={styles.btnDangerText}>HARD AI (ULTRA V2)</Text>
+                <Text style={[styles.buttonSubtext, {color: colors.danger}]}>Lock Head Algorithm</Text>
+              </AnimatedButton>
 
-            <TouchableOpacity
-              style={[styles.button, styles.backButton]}
-              onPress={goBack}
-              activeOpacity={0.7}>
-              <Text style={styles.buttonText}>← Back to Modes</Text>
-            </TouchableOpacity>
-          </>
-        )}
+              <AnimatedButton
+                style={[styles.button, styles.btnTertiary, {marginTop: 20}]}
+                onPress={goBack}>
+                <Text style={styles.btnTertiaryText}>BACK TO MODES</Text>
+              </AnimatedButton>
+            </>
+          )}
+        </Animated.View>
       </ScrollView>
       {AdService.shouldShowBannerAd() && (
         <View style={styles.bannerContainer}>
@@ -170,7 +225,7 @@ export default function MainMenuScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   scrollView: {
     flex: 1,
@@ -182,58 +237,110 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
+  logoArea: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  logoPlane: {
+    fontSize: 80,
+    textShadowColor: colors.accentGlow,
+    textShadowOffset: {width: 0, height: 0},
+    textShadowRadius: 20,
+  },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-    textAlign: 'center',
+    fontFamily: fonts.orbitronBlack,
+    fontSize: 26,
+    color: colors.textPrimary,
+    letterSpacing: 3,
+    marginTop: 10,
+  },
+  titleSub: {
+    fontFamily: fonts.orbitronRegular,
+    fontSize: 10,
+    color: 'rgba(0, 212, 255, 0.6)',
+    letterSpacing: 6,
+    marginTop: 4,
   },
   subtitle: {
-    fontSize: 20,
-    color: '#fff',
+    fontFamily: fonts.orbitronSemiBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    letterSpacing: 2,
     marginBottom: 10,
-    fontWeight: '600',
   },
   modeHint: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 16,
-    color: '#aaa',
+    color: colors.textMuted,
     marginBottom: 30,
   },
   button: {
     width: '100%',
     maxWidth: 300,
-    padding: 20,
-    borderRadius: 10,
-    marginVertical: 10,
+    borderRadius: 12,
+    marginVertical: 6,
     alignItems: 'center',
   },
-  standardButton: {
-    backgroundColor: '#2196F3',
+  btnPrimary: {
+    backgroundColor: colors.accent,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    shadowColor: colors.accent,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  extendedButton: {
-    backgroundColor: '#9C27B0',
+  btnPrimaryText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.textPrimary,
+    letterSpacing: 2,
   },
-  customButton: {
-    backgroundColor: '#FF5722',
+  btnSecondary: {
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
-  onlineButton: {
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: '#66BB6A',
+  btnSecondaryText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.accent,
+    letterSpacing: 2,
   },
-  easyButton: {
-    backgroundColor: '#4CAF50',
+  btnTertiary: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
-  mediumButton: {
-    backgroundColor: '#FF9800',
+  btnTertiaryText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.textSecondary,
+    letterSpacing: 2,
   },
-  hardButton: {
-    backgroundColor: '#F44336',
+  btnDanger: {
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
-  backButton: {
-    backgroundColor: '#607D8B',
-    marginTop: 20,
+  btnDangerText: {
+    fontFamily: fonts.orbitronBold,
+    fontSize: 14,
+    color: colors.danger,
+    letterSpacing: 2,
+  },
+  buttonSubtext: {
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 13,
+    color: colors.textMuted,
+    marginTop: 4,
   },
   bottomButtons: {
     flexDirection: 'row',
@@ -244,38 +351,27 @@ const styles = StyleSheet.create({
   },
   smallButton: {
     flex: 1,
-    padding: 15,
-    borderRadius: 10,
-    marginHorizontal: 5,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginHorizontal: 4,
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  profileButton: {
-    backgroundColor: '#2196F3',
-  },
-  shopButton: {
-    backgroundColor: '#FFD700',
-  },
-  settingsButton: {
-    backgroundColor: '#607D8B',
-  },
-  buttonText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
+  smallButtonGold: {
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+    backgroundColor: 'rgba(255, 215, 0, 0.05)',
   },
   smallButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  buttonSubtext: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.8,
-    marginTop: 5,
+    fontFamily: fonts.orbitronBold,
+    fontSize: 10,
+    color: colors.textSecondary,
+    letterSpacing: 1,
   },
   bannerContainer: {
     alignItems: 'center',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
 });

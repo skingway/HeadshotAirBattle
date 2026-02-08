@@ -3,7 +3,7 @@
  * Displays last 10 games played
  */
 
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,13 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Animated,
+  Pressable,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import StatisticsService from '../services/StatisticsService';
 import AuthService from '../services/AuthService';
+import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
   MainMenu: undefined;
@@ -28,6 +31,40 @@ type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'GameHistory'>;
 };
 
+function StaggeredItem({
+  index,
+  children,
+}: {
+  index: number;
+  children: React.ReactNode;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 250,
+      delay: index * 60,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [
+          {
+            translateX: anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [30, 0],
+            }),
+          },
+        ],
+      }}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export default function GameHistoryScreen({navigation}: Props) {
   const [games, setGames] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,9 +72,15 @@ export default function GameHistoryScreen({navigation}: Props) {
   const [sortBy, setSortBy] = useState<'date' | 'result'>('date');
   const [filterBy, setFilterBy] = useState<'all' | 'wins' | 'losses'>('all');
   const currentUserId = AuthService.getUserId();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     loadHistory();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {toValue: 1, duration: 400, useNativeDriver: true}),
+      Animated.timing(slideAnim, {toValue: 0, duration: 400, useNativeDriver: true}),
+    ]).start();
   }, []);
 
   const loadHistory = async () => {
@@ -61,14 +104,12 @@ export default function GameHistoryScreen({navigation}: Props) {
   const getFilteredAndSortedGames = () => {
     let filtered = games;
 
-    // Filter
     if (filterBy === 'wins') {
       filtered = games.filter(game => game.winner === currentUserId);
     } else if (filterBy === 'losses') {
       filtered = games.filter(game => game.winner !== currentUserId);
     }
 
-    // Sort
     if (sortBy === 'result') {
       filtered = [...filtered].sort((a, b) => {
         const aWon = a.winner === currentUserId ? 1 : 0;
@@ -85,25 +126,18 @@ export default function GameHistoryScreen({navigation}: Props) {
     const now = Date.now();
     const diff = now - timestamp;
 
-    // Less than 1 hour
     if (diff < 60 * 60 * 1000) {
       const minutes = Math.floor(diff / (60 * 1000));
       return `${minutes}m ago`;
     }
-
-    // Less than 24 hours
     if (diff < 24 * 60 * 60 * 1000) {
       const hours = Math.floor(diff / (60 * 60 * 1000));
       return `${hours}h ago`;
     }
-
-    // Less than 7 days
     if (diff < 7 * 24 * 60 * 60 * 1000) {
       const days = Math.floor(diff / (24 * 60 * 60 * 1000));
       return `${days}d ago`;
     }
-
-    // Full date
     return date.toLocaleDateString();
   };
 
@@ -131,58 +165,41 @@ export default function GameHistoryScreen({navigation}: Props) {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>📜 Game History</Text>
+        <Text style={styles.title}>GAME HISTORY</Text>
         <Text style={styles.subtitle}>Last 10 Games</Text>
       </View>
 
       {/* Controls */}
       <View style={styles.controls}>
-        {/* Filter */}
         <View style={styles.controlSection}>
-          <Text style={styles.controlLabel}>Filter:</Text>
+          <Text style={styles.controlLabel}>FILTER</Text>
           <View style={styles.buttonGroup}>
-            <TouchableOpacity
-              style={[styles.controlButton, filterBy === 'all' && styles.activeControl]}
-              onPress={() => setFilterBy('all')}>
-              <Text style={[styles.controlButtonText, filterBy === 'all' && styles.activeControlText]}>
-                All
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.controlButton, filterBy === 'wins' && styles.activeControl]}
-              onPress={() => setFilterBy('wins')}>
-              <Text style={[styles.controlButtonText, filterBy === 'wins' && styles.activeControlText]}>
-                Wins
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.controlButton, filterBy === 'losses' && styles.activeControl]}
-              onPress={() => setFilterBy('losses')}>
-              <Text style={[styles.controlButtonText, filterBy === 'losses' && styles.activeControlText]}>
-                Losses
-              </Text>
-            </TouchableOpacity>
+            {(['all', 'wins', 'losses'] as const).map(f => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.controlButton, filterBy === f && styles.activeControl]}
+                onPress={() => setFilterBy(f)}>
+                <Text style={[styles.controlButtonText, filterBy === f && styles.activeControlText]}>
+                  {f.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* Sort */}
         <View style={styles.controlSection}>
-          <Text style={styles.controlLabel}>Sort:</Text>
+          <Text style={styles.controlLabel}>SORT</Text>
           <View style={styles.buttonGroup}>
-            <TouchableOpacity
-              style={[styles.controlButton, sortBy === 'date' && styles.activeControl]}
-              onPress={() => setSortBy('date')}>
-              <Text style={[styles.controlButtonText, sortBy === 'date' && styles.activeControlText]}>
-                Date
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.controlButton, sortBy === 'result' && styles.activeControl]}
-              onPress={() => setSortBy('result')}>
-              <Text style={[styles.controlButtonText, sortBy === 'result' && styles.activeControlText]}>
-                Result
-              </Text>
-            </TouchableOpacity>
+            {(['date', 'result'] as const).map(s => (
+              <TouchableOpacity
+                key={s}
+                style={[styles.controlButton, sortBy === s && styles.activeControl]}
+                onPress={() => setSortBy(s)}>
+                <Text style={[styles.controlButtonText, sortBy === s && styles.activeControlText]}>
+                  {s.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       </View>
@@ -195,93 +212,74 @@ export default function GameHistoryScreen({navigation}: Props) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#4CAF50"
+            tintColor={colors.accent}
           />
         }>
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.loadingText}>Loading history...</Text>
-          </View>
-        ) : filteredGames.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyEmoji}>🎮</Text>
-            <Text style={styles.emptyText}>
-              {filterBy !== 'all'
-                ? `No ${filterBy} found`
-                : 'No games played yet'}
-            </Text>
-            <Text style={styles.emptySubtext}>
-              Play some games to see your history here!
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.listContainer}>
-            {filteredGames.map((game, index) => {
-              const won = isWinner(game);
-              return (
-                <TouchableOpacity
-                  key={game.id || `game_${index}`}
-                  style={[
-                    styles.gameCard,
-                    won ? styles.winCard : styles.lossCard,
-                  ]}
-                  onPress={() => viewBattleReport(game)}>
-                  {/* Result Badge */}
-                  <View style={[styles.resultBadge, won ? styles.winBadge : styles.lossBadge]}>
-                    <Text style={styles.resultText}>{won ? 'WIN' : 'LOSS'}</Text>
-                  </View>
+        <Animated.View style={{opacity: fadeAnim, transform: [{translateY: slideAnim}]}}>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={styles.loadingText}>Loading history...</Text>
+            </View>
+          ) : filteredGames.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyEmoji}>{'\uD83C\uDFAE'}</Text>
+              <Text style={styles.emptyText}>
+                {filterBy !== 'all'
+                  ? `No ${filterBy} found`
+                  : 'No games played yet'}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                Play some games to see your history here!
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.listContainer}>
+              {filteredGames.map((game, index) => {
+                const won = isWinner(game);
+                return (
+                  <StaggeredItem key={game.id || `game_${index}`} index={index}>
+                    <TouchableOpacity
+                      style={[
+                        styles.gameCard,
+                        won ? styles.winCard : styles.lossCard,
+                      ]}
+                      onPress={() => viewBattleReport(game)}>
+                      <View style={styles.gameInfo}>
+                        <View style={styles.gameHeader}>
+                          <Text style={styles.opponentText}>
+                            vs {getOpponentName(game)}
+                          </Text>
+                          <Text style={styles.dateText}>{formatDate(game.completedAt)}</Text>
+                        </View>
 
-                  {/* Game Info */}
-                  <View style={styles.gameInfo}>
-                    <View style={styles.gameHeader}>
-                      <Text style={styles.opponentText}>
-                        vs {getOpponentName(game)}
-                      </Text>
-                      <Text style={styles.dateText}>{formatDate(game.completedAt)}</Text>
-                    </View>
+                        <View style={styles.gameDetails}>
+                          <Text style={styles.detailText}>
+                            {game.boardSize}x{game.boardSize} | {game.airplaneCount} planes | {game.totalTurns} turns
+                          </Text>
+                        </View>
+                      </View>
 
-                    <View style={styles.gameDetails}>
-                      <View style={styles.detailItem}>
-                        <Text style={styles.detailLabel}>Type:</Text>
-                        <Text style={styles.detailValue}>
-                          {game.gameType === 'ai' ? '🤖 AI' : '🌐 Online'}
+                      <View style={won ? styles.tagWin : styles.tagLoss}>
+                        <Text style={won ? styles.tagWinText : styles.tagLossText}>
+                          {won ? 'WIN' : 'LOSS'}
                         </Text>
                       </View>
-                      <View style={styles.detailItem}>
-                        <Text style={styles.detailLabel}>Board:</Text>
-                        <Text style={styles.detailValue}>
-                          {game.boardSize}×{game.boardSize}
-                        </Text>
-                      </View>
-                      <View style={styles.detailItem}>
-                        <Text style={styles.detailLabel}>Planes:</Text>
-                        <Text style={styles.detailValue}>{game.airplaneCount}</Text>
-                      </View>
-                      <View style={styles.detailItem}>
-                        <Text style={styles.detailLabel}>Turns:</Text>
-                        <Text style={styles.detailValue}>{game.totalTurns}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* View Report Arrow */}
-                  <View style={styles.arrowContainer}>
-                    <Text style={styles.arrowText}>›</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
+                    </TouchableOpacity>
+                  </StaggeredItem>
+                );
+              })}
+            </View>
+          )}
+        </Animated.View>
       </ScrollView>
 
       {/* Back Button */}
-      <TouchableOpacity
+      <Pressable
         style={styles.backButton}
         onPress={() => navigation.goBack()}>
-        <Text style={styles.backButtonText}>← Back</Text>
-      </TouchableOpacity>
+        <Text style={styles.backButtonText}>BACK</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -289,37 +287,41 @@ export default function GameHistoryScreen({navigation}: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: colors.bgPrimary,
   },
   header: {
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 2,
-    borderBottomColor: '#4CAF50',
+    borderBottomColor: colors.accentBorder,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 20,
+    color: colors.textPrimary,
+    letterSpacing: 2,
     marginBottom: 4,
   },
   subtitle: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#999',
+    color: colors.textMuted,
   },
   controls: {
-    backgroundColor: '#16213e',
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#0f3460',
+    borderBottomColor: colors.divider,
   },
   controlSection: {
     marginBottom: 10,
   },
   controlLabel: {
-    fontSize: 12,
-    color: '#999',
+    fontFamily: fonts.rajdhaniSemiBold,
+    fontSize: 11,
+    color: colors.textMuted,
     marginBottom: 8,
+    letterSpacing: 2,
   },
   buttonGroup: {
     flexDirection: 'row',
@@ -329,23 +331,23 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#0f3460',
-    borderRadius: 6,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'transparent',
   },
   activeControl: {
-    backgroundColor: '#1a4d2e',
-    borderColor: '#4CAF50',
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accentBorder,
   },
   controlButtonText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 12,
-    color: '#999',
-    fontWeight: '600',
+    color: colors.textMuted,
   },
   activeControlText: {
-    color: '#4CAF50',
+    color: colors.accent,
   },
   content: {
     flex: 1,
@@ -361,8 +363,9 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 16,
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 16,
-    color: '#999',
+    color: colors.textMuted,
   },
   emptyContainer: {
     flex: 1,
@@ -375,14 +378,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontFamily: fonts.orbitronBold,
+    fontSize: 16,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   emptySubtext: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 14,
-    color: '#999',
+    color: colors.textMuted,
     textAlign: 'center',
   },
   listContainer: {
@@ -390,37 +394,20 @@ const styles = StyleSheet.create({
   },
   gameCard: {
     flexDirection: 'row',
-    backgroundColor: '#16213e',
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 30, 60, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.15)',
+    borderRadius: 14,
     padding: 15,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    elevation: 2,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+    alignItems: 'center',
   },
   winCard: {
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: colors.success,
   },
   lossCard: {
-    borderLeftColor: '#F44336',
-  },
-  resultBadge: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  winBadge: {
-    backgroundColor: '#1a4d2e',
-  },
-  lossBadge: {
-    backgroundColor: '#4d1a1a',
-  },
-  resultText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fff',
+    borderLeftColor: colors.danger,
   },
   gameInfo: {
     flex: 1,
@@ -429,54 +416,67 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   opponentText: {
+    fontFamily: fonts.rajdhaniSemiBold,
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textPrimary,
   },
   dateText: {
+    fontFamily: fonts.rajdhaniRegular,
     fontSize: 12,
-    color: '#999',
+    color: colors.textMuted,
   },
   gameDetails: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
   },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  detailText: {
+    fontFamily: fonts.rajdhaniRegular,
+    fontSize: 13,
+    color: colors.textMuted,
   },
-  detailLabel: {
+  tagWin: {
+    backgroundColor: colors.successDim,
+    borderWidth: 1,
+    borderColor: colors.successBorder,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginLeft: 10,
+  },
+  tagWinText: {
+    fontFamily: fonts.orbitronBold,
     fontSize: 11,
-    color: '#999',
-    marginRight: 4,
+    color: colors.success,
   },
-  detailValue: {
+  tagLoss: {
+    backgroundColor: colors.dangerDim,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginLeft: 10,
+  },
+  tagLossText: {
+    fontFamily: fonts.orbitronBold,
     fontSize: 11,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  arrowContainer: {
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  arrowText: {
-    fontSize: 24,
-    color: '#4CAF50',
+    color: colors.danger,
   },
   backButton: {
-    backgroundColor: '#607D8B',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: 15,
-    margin: 20,
-    borderRadius: 10,
+    margin: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.orbitronBold,
+    color: colors.textSecondary,
+    fontSize: 14,
+    letterSpacing: 2,
   },
 });
