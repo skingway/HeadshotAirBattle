@@ -45,6 +45,7 @@ function AnimatedButton({
   const scaleAnim = useRef(new Animated.Value(1)).current;
   return (
     <Pressable
+      style={{flex: 1}}
       onPressIn={() => {
         Animated.spring(scaleAnim, {toValue: 0.97, useNativeDriver: true}).start();
       }}
@@ -102,7 +103,14 @@ export default function BattleReportScreen({navigation, route}: Props) {
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp);
-    return date.toLocaleString();
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
   const getOpponentName = (): string => {
@@ -113,15 +121,24 @@ export default function BattleReportScreen({navigation, route}: Props) {
   };
 
   const getGameDuration = (): string => {
-    const estimatedSeconds = gameData.totalTurns * 30;
-    const minutes = Math.floor(estimatedSeconds / 60);
-    const seconds = estimatedSeconds % 60;
-    return `~${minutes}m ${seconds}s`;
+    if (gameData.startedAt && gameData.completedAt) {
+      const durationMs = gameData.completedAt - gameData.startedAt;
+      const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}m ${seconds}s`;
+    }
+    return 'N/A';
   };
 
   const getAccuracyEstimate = (): string => {
-    const efficiency = ((gameData.airplaneCount * 12) / gameData.totalTurns) * 100;
-    return efficiency.toFixed(1) + '%';
+    if (gameData.playerStats) {
+      const total = (gameData.playerStats.hits || 0) + (gameData.playerStats.misses || 0);
+      if (total > 0) {
+        return (((gameData.playerStats.hits || 0) / total) * 100).toFixed(1) + '%';
+      }
+    }
+    return 'N/A';
   };
 
   return (
@@ -244,7 +261,7 @@ export default function BattleReportScreen({navigation, route}: Props) {
                 <Text style={styles.summaryValue}>{getGameDuration()}</Text>
               </View>
               <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>EFFICIENCY</Text>
+                <Text style={styles.summaryLabel}>ACCURACY</Text>
                 <Text style={styles.summaryValue}>{getAccuracyEstimate()}</Text>
               </View>
             </View>
@@ -333,17 +350,19 @@ export default function BattleReportScreen({navigation, route}: Props) {
 
       {/* Bottom Buttons */}
       <View style={styles.bottomButtons}>
-        <AnimatedButton
+        <TouchableOpacity
           style={styles.btnBack}
+          activeOpacity={0.7}
           onPress={() => navigation.goBack()}>
           <Text style={styles.btnBackText}>BACK</Text>
-        </AnimatedButton>
+        </TouchableOpacity>
 
-        <AnimatedButton
+        <TouchableOpacity
           style={styles.btnMain}
+          activeOpacity={0.7}
           onPress={() => navigation.navigate('MainMenu')}>
           <Text style={styles.btnMainText}>MAIN MENU</Text>
-        </AnimatedButton>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

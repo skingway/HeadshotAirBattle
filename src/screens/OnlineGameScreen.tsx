@@ -13,6 +13,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RouteProp} from '@react-navigation/native';
@@ -25,10 +27,12 @@ import AudioManager from '../services/AudioManager';
 import DeploymentPhase from '../components/DeploymentPhase';
 import CountdownScreen from '../components/CountdownScreen';
 import DualBoardView from '../components/DualBoardView';
+import BombDropAnimation, {BombDropAnimationRef} from '../components/BombDropAnimation';
 import database from '@react-native-firebase/database';
 import MultiplayerService, {GameState} from '../services/MultiplayerService';
 import AuthService from '../services/AuthService';
 import StatisticsService from '../services/StatisticsService';
+import {AchievementService} from '../services/AchievementService';
 import {colors, fonts} from '../theme/colors';
 
 type RootStackParamList = {
@@ -57,6 +61,10 @@ export default function OnlineGameScreen({navigation, route}: Props) {
   const opponentBoardRef = useRef<BoardManager | null>(null);
   const myRole = useRef<'player1' | 'player2' | null>(null);
   const phaseRef = useRef<GamePhase>('deploying');
+  const hasGameEndedRef = useRef(false);
+  const gameStartedAtRef = useRef<number>(Date.now());
+  const bombRef = useRef<BombDropAnimationRef>(null);
+  const shakeOffset = useRef(new Animated.Value(0)).current;
 
   // Helper to prevent backwards phase transitions
   const transitionToPhase = useCallback((newPhase: GamePhase, reason?: string) => {
@@ -80,6 +88,45 @@ export default function OnlineGameScreen({navigation, route}: Props) {
   useEffect(() => {
     AudioManager.init();
   }, []);
+
+  // Polling fallback: when in 'waiting' phase, poll Firebase every 2s to check if both ready
+  useEffect(() => {
+    if (phase !== 'waiting') return;
+
+    console.log('[OnlineGameScreen] Starting deployment polling fallback');
+    const pollInterval = setInterval(async () => {
+      try {
+        const snapshot = await database().ref(`activeGames/${gameId}`).once('value');
+        const data = snapshot.val();
+        if (!data) return;
+
+        const p1 = data.player1;
+        const p2 = data.player2;
+        const p1Ready = p1?.ready && p1?.board && (p1?.deploymentReady || (p1?.ready && p1?.board));
+        const p2Ready = p2?.ready && p2?.board && (p2?.deploymentReady || (p2?.ready && p2?.board));
+
+        console.log('[OnlineGameScreen] Poll check: p1Ready=', !!p1Ready, 'p2Ready=', !!p2Ready, 'status=', data.status);
+
+        if (p1Ready && p2Ready && data.status === 'deploying') {
+          console.log('[OnlineGameScreen] Poll: both ready, starting battle');
+          const firstPlayerId = p1?.id;
+          await database().ref(`activeGames/${gameId}`).update({
+            status: 'battle',
+            currentTurn: firstPlayerId,
+            turnStartedAt: Date.now(),
+            battleStartedAt: Date.now(),
+          });
+        }
+      } catch (err) {
+        console.log('[OnlineGameScreen] Poll error:', err);
+      }
+    }, 2000);
+
+    return () => {
+      console.log('[OnlineGameScreen] Clearing deployment polling fallback');
+      clearInterval(pollInterval);
+    };
+  }, [phase, gameId]);
 
   // Listen for game state changes
   useEffect(() => {
@@ -106,7 +153,13 @@ export default function OnlineGameScreen({navigation, route}: Props) {
         [
           {
             text: 'OK',
-            onPress: () => navigation.navigate('OnlineMode'),
+            onPress: async () => {
+              await MultiplayerService.leaveGame();
+              navigation.reset({
+                index: 1,
+                routes: [{name: 'MainMenu'}, {name: 'OnlineMode'}],
+              });
+            },
           },
         ]
       );
@@ -135,6 +188,21 @@ export default function OnlineGameScreen({navigation, route}: Props) {
           // The battle will be started automatically by MultiplayerService.submitBoard()
           createOpponentBoard(opponent, state);
           transitionToPhase('countdown', 'both players ready, waiting for battle status');
+
+          // Backup: if status is still 'deploying' but both are ready with boards,
+          // proactively start battle in case submitBoard() missed it
+          if (state.status === 'deploying') {
+            console.log('[OnlineGameScreen] Backup: triggering battle start from deploying phase');
+            const firstPlayerId = state.player1?.id;
+            database().ref(`activeGames/${gameId}`).update({
+              status: 'battle',
+              currentTurn: firstPlayerId,
+              turnStartedAt: Date.now(),
+              battleStartedAt: Date.now(),
+            }).catch(err => {
+              console.log('[OnlineGameScreen] Backup battle start failed (may already be set):', err);
+            });
+          }
         } else {
           console.log('[OnlineGameScreen] Waiting for board data - myPlayer.board:', !!myPlayer?.board, 'opponent.board:', !!opponent?.board);
         }
@@ -198,6 +266,8 @@ export default function OnlineGameScreen({navigation, route}: Props) {
         syncOpponentAttacks(opponent.attacks);
       }
     } else if (state.status === 'finished') {
+      if (hasGameEndedRef.current) return;
+      hasGameEndedRef.current = true;
       transitionToPhase('gameover', 'game finished');
       const userId = AuthService.getUserId();
       const didWin = state.winner === userId;
@@ -236,7 +306,8 @@ export default function OnlineGameScreen({navigation, route}: Props) {
           boardSize: state.boardSize,
           airplaneCount: state.airplaneCount,
           totalTurns: attackCount,
-          completedAt: Date.now(),
+          completedAt: state.completedAt || Date.now(),
+          startedAt: state.battleStartedAt || state.createdAt || gameStartedAtRef.current,
           // Use same field names as AI mode for BattleReportScreen compatibility
           playerBoardData: {
             airplanes: playerBoard.airplanes.map(a => ({
@@ -262,8 +333,37 @@ export default function OnlineGameScreen({navigation, route}: Props) {
           aiStats: opponent?.stats || {hits: 0, misses: 0, kills: 0},
         };
 
-        StatisticsService.saveGameHistory(historyData).then(success => {
+        StatisticsService.saveGameHistory(historyData).then(async success => {
           console.log('[OnlineGameScreen] Game history save result:', success);
+          if (success) {
+            // Check achievements after online game
+            try {
+              const userStats = await StatisticsService.refresh();
+              const gameResult = {
+                won: didWin,
+                difficulty: 'online',
+                boardSize: state.boardSize,
+                airplaneCount: state.airplaneCount,
+                totalTurns: attackCount,
+                playerStats: myPlayer?.stats || {hits: 0, misses: 0, kills: 0},
+                aiStats: opponent?.stats || {hits: 0, misses: 0, kills: 0},
+                accuracy: (myPlayer?.stats?.hits || 0) + (myPlayer?.stats?.misses || 0) > 0
+                  ? ((myPlayer?.stats?.hits || 0) / ((myPlayer?.stats?.hits || 0) + (myPlayer?.stats?.misses || 0))) * 100
+                  : 0,
+              };
+              const gameEndAchievements = await AchievementService.checkGameEndAchievements(gameResult, userStats);
+              const statsAchievements = await AchievementService.checkStatsAchievements(gameResult, userStats);
+              const allNew = [...gameEndAchievements, ...statsAchievements];
+              if (allNew.length > 0) {
+                const names = allNew.map(a => `${a.icon} ${a.name}`).join('\n');
+                setTimeout(() => {
+                  Alert.alert('Achievement Unlocked!', names, [{text: 'OK'}]);
+                }, 1000);
+              }
+            } catch (err) {
+              console.error('[OnlineGameScreen] Error checking achievements:', err);
+            }
+          }
         });
       }
     }
@@ -373,7 +473,20 @@ export default function OnlineGameScreen({navigation, route}: Props) {
     AudioManager.playBGM();
   };
 
-  const handleCellPress = async (row: number, col: number) => {
+  // Estimate target screen position from row/col for bomb animation
+  const getTargetPosition = (row: number, col: number) => {
+    const screenWidth = Dimensions.get('window').width;
+    const bs = gameState?.boardSize || 10;
+    const enemyBoardWidth = Math.min(screenWidth - 40, 380);
+    const cellSize = Math.floor((enemyBoardWidth - bs * 2) / bs);
+    const boardLeft = (screenWidth - enemyBoardWidth) / 2 + 20 + 5;
+    const boardTop = 180;
+    const targetX = boardLeft + col * (cellSize + 2) + cellSize / 2;
+    const targetY = boardTop + row * (cellSize + 2) + cellSize / 2;
+    return {targetX, targetY};
+  };
+
+  const handleCellPress = async (row: number, col: number, pageX?: number, pageY?: number) => {
     const opponentBoard = opponentBoardRef.current;
     if (phase !== 'battle' || !isMyTurn || !opponentBoard || !gameState) {
       return;
@@ -388,37 +501,57 @@ export default function OnlineGameScreen({navigation, route}: Props) {
     // Process attack locally against opponent's board
     const attackResult = opponentBoard.processAttack(row, col);
     const coord = CoordinateSystem.positionToCoordinate(row, col);
+    // Use actual touch coordinates if available, otherwise estimate
+    const fallback = getTargetPosition(row, col);
+    const targetX = pageX ?? fallback.targetX;
+    const targetY = pageY ?? fallback.targetY;
 
-    // Play sound and show result
-    if (attackResult.result === GameConstants.ATTACK_RESULTS.MISS) {
-      addLog(`You attacked ${coord} - MISS`);
-      AudioManager.playSFX('miss');
-    } else if (attackResult.result === GameConstants.ATTACK_RESULTS.HIT) {
-      addLog(`You attacked ${coord} - HIT! 🎯`);
-      AudioManager.playSFX('hit');
-    } else if (attackResult.result === GameConstants.ATTACK_RESULTS.KILL) {
-      addLog(`You attacked ${coord} - KILL! ✈️💥`);
-      AudioManager.playSFX('kill');
+    const animType: 'miss' | 'hit' | 'kill' =
+      attackResult.result === GameConstants.ATTACK_RESULTS.KILL ? 'kill' :
+      attackResult.result === GameConstants.ATTACK_RESULTS.HIT ? 'hit' : 'miss';
 
-      // Check if all enemy airplanes destroyed
-      if (opponentBoard.areAllAirplanesDestroyed()) {
-        const userId = AuthService.getUserId();
-        await MultiplayerService.attack(row, col, attackResult.result);
-        await MultiplayerService.endGame(userId || '');
+    const doPostAttack = async () => {
+      // Play sound and show result
+      if (attackResult.result === GameConstants.ATTACK_RESULTS.MISS) {
+        addLog(`You attacked ${coord} - MISS`);
+        AudioManager.playSFX('miss');
+      } else if (attackResult.result === GameConstants.ATTACK_RESULTS.HIT) {
+        addLog(`You attacked ${coord} - HIT! 🎯`);
+        AudioManager.playSFX('hit');
+      } else if (attackResult.result === GameConstants.ATTACK_RESULTS.KILL) {
+        addLog(`You attacked ${coord} - KILL! ✈️💥`);
+        AudioManager.playSFX('kill');
+
+        // Check if all enemy airplanes destroyed
+        if (opponentBoard.areAllAirplanesDestroyed()) {
+          const userId = AuthService.getUserId();
+          await MultiplayerService.attack(row, col, attackResult.result);
+          await MultiplayerService.endGame(userId || '');
+          return;
+        }
+      }
+
+      // Send attack result to server
+      const success = await MultiplayerService.attack(row, col, attackResult.result);
+
+      if (!success) {
+        Alert.alert('Error', 'Failed to send attack');
         return;
       }
+
+      // Force re-render to show attack result
+      setRenderKey(prev => prev + 1);
+    };
+
+    if (bombRef.current) {
+      bombRef.current.playAttack(targetX, targetY, animType, () => {
+        doPostAttack();
+      }, (dx: number) => {
+        shakeOffset.setValue(dx);
+      });
+    } else {
+      doPostAttack();
     }
-
-    // Send attack result to server
-    const success = await MultiplayerService.attack(row, col, attackResult.result);
-
-    if (!success) {
-      Alert.alert('Error', 'Failed to send attack');
-      return;
-    }
-
-    // Force re-render to show attack result
-    setRenderKey(prev => prev + 1);
   };
 
   const handleSurrender = () => {
@@ -434,7 +567,10 @@ export default function OnlineGameScreen({navigation, route}: Props) {
             const userId = AuthService.getUserId();
             const opponent = myRole.current === 'player1' ? gameState?.player2 : gameState?.player1;
             await MultiplayerService.endGame(opponent?.id || '');
-            navigation.navigate('OnlineMode');
+            navigation.reset({
+              index: 1,
+              routes: [{name: 'MainMenu'}, {name: 'OnlineMode'}],
+            });
           },
         },
       ]
@@ -462,7 +598,10 @@ export default function OnlineGameScreen({navigation, route}: Props) {
                 text: 'Yes',
                 onPress: async () => {
                   await MultiplayerService.leaveGame();
-                  navigation.navigate('OnlineMode');
+                  navigation.reset({
+                    index: 1,
+                    routes: [{name: 'MainMenu'}, {name: 'OnlineMode'}],
+                  });
                 },
               },
             ]
@@ -487,7 +626,10 @@ export default function OnlineGameScreen({navigation, route}: Props) {
             style={styles.leaveButton}
             onPress={async () => {
               await MultiplayerService.leaveGame();
-              navigation.navigate('OnlineMode');
+              navigation.reset({
+                index: 1,
+                routes: [{name: 'MainMenu'}, {name: 'OnlineMode'}],
+              });
             }}>
             <Text style={styles.leaveButtonText}>Leave Game</Text>
           </TouchableOpacity>
@@ -543,7 +685,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
 
       {phase === 'battle' && playerBoardRef.current && opponentBoardRef.current && (
         <ScrollView style={styles.contentScroll} contentContainerStyle={styles.contentScrollContainer}>
-          <View style={styles.battleContainer}>
+          <Animated.View style={[styles.battleContainer, {transform: [{translateX: shakeOffset}]}]}>
             <DualBoardView
               key={renderKey}
               playerBoard={playerBoardRef.current}
@@ -552,7 +694,7 @@ export default function OnlineGameScreen({navigation, route}: Props) {
               onCellPress={handleCellPress}
               showEnemyAirplanes={false}
             />
-          </View>
+          </Animated.View>
 
           <View style={styles.logContainer}>
             <Text style={styles.logTitle}>Game Log:</Text>
@@ -572,6 +714,8 @@ export default function OnlineGameScreen({navigation, route}: Props) {
           </TouchableOpacity>
         </ScrollView>
       )}
+
+      <BombDropAnimation ref={bombRef} />
 
       {phase === 'gameover' && (
         <View style={styles.gameoverContainer}>

@@ -5,19 +5,43 @@
  * - Player board (small): Defensive overview
  */
 
-import React, {useState, useEffect} from 'react';
-import {View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions} from 'react-native';
+import React, {useState, useEffect, useRef} from 'react';
+import {View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Animated} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import BoardManager from '../core/BoardManager';
 import SkinService from '../services/SkinService';
 import {useOrientation} from '../hooks/useOrientation';
 import {colors, fonts} from '../theme/colors';
+import {generateCellEffects, hexToRgba} from '../utils/ColorUtils';
 
 interface DualBoardViewProps {
   playerBoard: BoardManager;
   enemyBoard: BoardManager;
   currentTurn: 'player' | 'ai';
-  onCellPress: (row: number, col: number) => void;
+  onCellPress: (row: number, col: number, pageX?: number, pageY?: number) => void;
   showEnemyAirplanes?: boolean; // For debugging
+}
+
+// Pulsing glow component for hit cells
+function PulsingCell({children, glowColor, cellSize}: {children: React.ReactNode; glowColor: string; cellSize: number}) {
+  const opacity = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {toValue: 1, duration: 800, useNativeDriver: true}),
+        Animated.timing(opacity, {toValue: 0.6, duration: 800, useNativeDriver: true}),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View style={{opacity, width: cellSize, height: cellSize}}>
+      {children}
+    </Animated.View>
+  );
 }
 
 export default function DualBoardView({
@@ -89,6 +113,7 @@ export default function DualBoardView({
     // Get current theme colors
     const themeColors = SkinService.getCurrentThemeColors();
     const airplaneColor = SkinService.getCurrentSkinColor();
+    const effects = generateCellEffects(themeColors);
 
     const rows = [];
 
@@ -100,55 +125,51 @@ export default function DualBoardView({
         const airplaneInfo = getAirplaneAtPosition(board, row, col);
         const attacked = wasAttacked(board, row, col);
 
-        let cellStyle = [styles.cell, {width: cellSize, height: cellSize}];
+        let cellState: 'empty' | 'airplane' | 'head' | 'hit' | 'killed' | 'miss' = 'empty';
         let cellContent = '';
-        let backgroundColor = themeColors.cellEmpty;
 
         if (isEnemy) {
           // Enemy board: only show attack results
           if (attacked) {
             if (airplaneInfo) {
-              // Only show KILLED state for the head cell when airplane is destroyed
               if (airplaneInfo.airplane.isDestroyed && airplaneInfo.cellType === 'head') {
-                backgroundColor = themeColors.cellKilled;
+                cellState = 'killed';
                 cellContent = '💥';
               } else {
-                backgroundColor = themeColors.cellHit;
+                cellState = 'hit';
                 cellContent = '🔥';
               }
             } else {
-              backgroundColor = themeColors.cellMiss;
+              cellState = 'miss';
               cellContent = '○';
             }
           } else {
-            backgroundColor = themeColors.cellEmpty;
+            cellState = 'empty';
           }
 
           // Debug: show enemy airplanes
           if (showEnemyAirplanes && airplaneInfo && !attacked) {
-            backgroundColor = airplaneColor;
+            cellState = 'airplane';
           }
         } else {
           // Player board: show everything
           if (attacked) {
             if (airplaneInfo) {
-              // Only show KILLED state for the head cell when airplane is destroyed
               if (airplaneInfo.airplane.isDestroyed && airplaneInfo.cellType === 'head') {
-                backgroundColor = themeColors.cellKilled;
+                cellState = 'killed';
                 cellContent = '💥';
               } else {
-                backgroundColor = themeColors.cellHit;
+                cellState = 'hit';
                 cellContent = '🔥';
               }
             } else {
-              backgroundColor = themeColors.cellMiss;
+              cellState = 'miss';
               cellContent = '○';
             }
           } else if (airplaneInfo) {
-            backgroundColor = airplaneColor;
-            // Show airplane head direction
             if (airplaneInfo.cellType === 'head') {
-              const directionArrows = {
+              cellState = 'head';
+              const directionArrows: Record<string, string> = {
                 up: '↑',
                 down: '↓',
                 left: '←',
@@ -156,23 +177,159 @@ export default function DualBoardView({
               };
               cellContent = directionArrows[airplaneInfo.airplane.direction] || '✈';
             } else {
+              cellState = 'airplane';
               cellContent = '✈';
             }
           } else {
-            backgroundColor = themeColors.cellEmpty;
+            cellState = 'empty';
           }
+        }
+
+        // Render cell based on state
+        let cellInner: React.ReactNode;
+
+        if (cellState === 'empty') {
+          cellInner = (
+            <View style={[
+              styles.cellInner,
+              {
+                width: cellSize,
+                height: cellSize,
+                backgroundColor: effects.empty.bg,
+                borderWidth: 0.5,
+                borderColor: effects.empty.border,
+              },
+            ]} />
+          );
+        } else if (cellState === 'airplane') {
+          cellInner = (
+            <LinearGradient
+              colors={[effects.airplane.gradientStart, effects.airplane.gradientEnd]}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={[styles.cellInner, {width: cellSize, height: cellSize}]}>
+              {/* Wing detail line */}
+              <View style={[
+                styles.wingLine,
+                {backgroundColor: effects.airplane.wingLine, width: cellSize * 0.6, height: 1},
+              ]} />
+              <Text style={[styles.cellText, {fontSize: Math.max(8, cellSize * 0.45)}]}>
+                {cellContent}
+              </Text>
+            </LinearGradient>
+          );
+        } else if (cellState === 'head') {
+          cellInner = (
+            <LinearGradient
+              colors={[effects.head.gradientStart, effects.head.gradientEnd]}
+              start={{x: 0.5, y: 0}}
+              end={{x: 0.5, y: 1}}
+              style={[styles.cellInner, {width: cellSize, height: cellSize}]}>
+              {/* Reticle circle */}
+              <View style={[
+                styles.reticle,
+                {
+                  width: cellSize * 0.7,
+                  height: cellSize * 0.7,
+                  borderRadius: cellSize * 0.35,
+                  borderColor: effects.head.reticle,
+                },
+              ]}>
+                {/* Center dot */}
+                <View style={[
+                  styles.centerDot,
+                  {
+                    width: cellSize * 0.15,
+                    height: cellSize * 0.15,
+                    borderRadius: cellSize * 0.075,
+                    backgroundColor: effects.head.centerDot,
+                  },
+                ]} />
+              </View>
+              <Text style={[styles.cellTextOverlay, {fontSize: Math.max(7, cellSize * 0.35)}]}>
+                {cellContent}
+              </Text>
+            </LinearGradient>
+          );
+        } else if (cellState === 'hit') {
+          cellInner = (
+            <PulsingCell glowColor={effects.hit.glow} cellSize={cellSize}>
+              <LinearGradient
+                colors={[effects.hit.gradientStart, effects.hit.gradientEnd]}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 1}}
+                style={[styles.cellInner, {width: cellSize, height: cellSize}]}>
+                <Text style={[styles.cellText, {fontSize: Math.max(8, cellSize * 0.5)}]}>
+                  {cellContent}
+                </Text>
+              </LinearGradient>
+            </PulsingCell>
+          );
+        } else if (cellState === 'killed') {
+          cellInner = (
+            <LinearGradient
+              colors={[effects.killed.gradientStart, effects.killed.gradientEnd]}
+              start={{x: 0.5, y: 0}}
+              end={{x: 0.5, y: 1}}
+              style={[styles.cellInner, {width: cellSize, height: cellSize}]}>
+              {/* X overlay */}
+              <View style={styles.xContainer}>
+                <View style={[
+                  styles.xLine,
+                  {
+                    backgroundColor: effects.killed.xOverlay,
+                    width: cellSize * 0.6,
+                    height: 2,
+                    transform: [{rotate: '45deg'}],
+                  },
+                ]} />
+                <View style={[
+                  styles.xLine,
+                  {
+                    backgroundColor: effects.killed.xOverlay,
+                    width: cellSize * 0.6,
+                    height: 2,
+                    transform: [{rotate: '-45deg'}],
+                  },
+                ]} />
+              </View>
+              <Text style={[styles.cellText, {fontSize: Math.max(8, cellSize * 0.5)}]}>
+                {cellContent}
+              </Text>
+            </LinearGradient>
+          );
+        } else if (cellState === 'miss') {
+          cellInner = (
+            <View style={[
+              styles.cellInner,
+              {
+                width: cellSize,
+                height: cellSize,
+                backgroundColor: effects.miss.bg,
+              },
+            ]}>
+              {/* Small centered dot */}
+              <View style={[
+                styles.missDot,
+                {
+                  width: cellSize * 0.2,
+                  height: cellSize * 0.2,
+                  borderRadius: cellSize * 0.1,
+                  backgroundColor: effects.miss.dot,
+                },
+              ]} />
+            </View>
+          );
         }
 
         cells.push(
           <TouchableOpacity
             key={cellKey}
-            style={[cellStyle, {backgroundColor}]}
-            onPress={() => onPress && onPress(row, col)}
+            onPress={(e) => onPress && onPress(row, col, e.nativeEvent.pageX, e.nativeEvent.pageY)}
             disabled={!onPress || currentTurn !== 'player'}
-            activeOpacity={0.7}>
-            <Text style={[styles.cellText, {fontSize: Math.max(8, cellSize * 0.5)}]}>
-              {cellContent}
-            </Text>
+            activeOpacity={0.7}
+            style={{margin: 1, borderRadius: 2, overflow: 'hidden'}}>
+            {cellInner}
           </TouchableOpacity>
         );
       }
@@ -261,9 +418,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 1,
   },
-  playerBoardWrapper: {
-    alignItems: 'center',
-  },
   board: {
     backgroundColor: 'rgba(0, 30, 60, 0.6)',
     padding: 5,
@@ -272,29 +426,43 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
   },
-  cell: {
+  cellInner: {
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 1,
     borderRadius: 2,
-  },
-  cellEmpty: {
-    backgroundColor: 'rgba(0, 20, 40, 0.5)',
-  },
-  cellAirplane: {
-    backgroundColor: 'rgba(0, 212, 255, 0.25)',
-  },
-  cellHit: {
-    backgroundColor: 'rgba(255, 152, 0, 0.6)',
-  },
-  cellMiss: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  cellKilled: {
-    backgroundColor: 'rgba(255, 40, 40, 0.7)',
   },
   cellText: {
     color: colors.textPrimary,
     fontWeight: 'bold',
+  },
+  cellTextOverlay: {
+    color: colors.textPrimary,
+    fontWeight: 'bold',
+    position: 'absolute',
+  },
+  wingLine: {
+    position: 'absolute',
+    top: '50%',
+    opacity: 0.5,
+  },
+  reticle: {
+    position: 'absolute',
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerDot: {
+    // dimensions set inline
+  },
+  xContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  xLine: {
+    position: 'absolute',
+  },
+  missDot: {
+    // dimensions set inline
   },
 });

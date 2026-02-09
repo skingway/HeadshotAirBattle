@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useRef} from 'react';
+import React, {useEffect, useState, useRef, useCallback} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   Alert,
   StatusBar,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RouteProp} from '@react-navigation/native';
@@ -25,6 +27,7 @@ import StatisticsService from '../services/StatisticsService';
 import AuthService from '../services/AuthService';
 import {AchievementService} from '../services/AchievementService';
 import AdService from '../services/AdService';
+import BombDropAnimation, {BombDropAnimationRef} from '../components/BombDropAnimation';
 import {useOrientation} from '../hooks/useOrientation';
 import {colors, fonts} from '../theme/colors';
 
@@ -63,10 +66,15 @@ export default function GameScreen({navigation, route}: Props) {
   const [timeRemaining, setTimeRemaining] = useState<number>(GameConstants.TURN_TIMER.DURATION);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const gameStartedAtRef = useRef<number>(Date.now());
 
   // Screen orientation
   const orientation = useOrientation();
   const isLandscape = orientation === 'landscape';
+
+  // Bomb animation
+  const bombRef = useRef<BombDropAnimationRef>(null);
+  const shakeOffset = useRef(new Animated.Value(0)).current;
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -129,6 +137,7 @@ export default function GameScreen({navigation, route}: Props) {
 
   const handleCountdownComplete = () => {
     setPhase('battle');
+    gameStartedAtRef.current = Date.now();
     addLog("Battle started! It's your turn!");
     addLog("Tap on enemy board to attack.");
     // Start background music for battle
@@ -187,6 +196,7 @@ export default function GameScreen({navigation, route}: Props) {
               airplaneCount: airplaneCount,
               totalTurns: turnCount,
               completedAt: Date.now(),
+              startedAt: gameStartedAtRef.current,
               // Board snapshot data - preserve battle state even when surrendering
               playerBoardData: playerBoard ? {
                 airplanes: playerBoard.airplanes.map(a => ({
@@ -359,6 +369,119 @@ export default function GameScreen({navigation, route}: Props) {
     }
   };
 
+  // Estimate target screen position from row/col
+  const getTargetPosition = (row: number, col: number) => {
+    const screenWidth = Dimensions.get('window').width;
+    const enemyBoardWidth = Math.min(screenWidth - 40, 380);
+    const cellSize = Math.floor((enemyBoardWidth - boardSize * 2) / boardSize);
+    const boardLeft = (screenWidth - enemyBoardWidth) / 2 + 20 + 5; // padding + board padding
+    const boardTop = 180; // approximate header + board title offset
+    const targetX = boardLeft + col * (cellSize + 2) + cellSize / 2;
+    const targetY = boardTop + row * (cellSize + 2) + cellSize / 2;
+    return {targetX, targetY};
+  };
+
+  // Map attack result to animation result type
+  const getAnimResultType = (attackResult: string): 'miss' | 'hit' | 'kill' => {
+    if (attackResult === GameConstants.ATTACK_RESULTS.KILL) return 'kill';
+    if (attackResult === GameConstants.ATTACK_RESULTS.HIT) return 'hit';
+    return 'miss';
+  };
+
+  // Process post-attack logic (SFX, stats, win check, turn switch)
+  const processPostAttack = (
+    result: any,
+    coord: string,
+    isRandom: boolean,
+    board: BoardManager,
+  ) => {
+    const prefix = isRandom ? 'Random attack' : 'You attacked';
+
+    if (result.result === GameConstants.ATTACK_RESULTS.MISS) {
+      addLog(`${prefix} ${coord} - MISS`);
+      AudioManager.playSFX('miss');
+      setPlayerStats(prev => ({...prev, misses: prev.misses + 1}));
+    } else if (result.result === GameConstants.ATTACK_RESULTS.HIT) {
+      addLog(`${prefix} ${coord} - HIT! 🎯`);
+      AudioManager.playSFX('hit');
+      setPlayerStats(prev => ({...prev, hits: prev.hits + 1}));
+    } else if (result.result === GameConstants.ATTACK_RESULTS.KILL) {
+      addLog(`${prefix} ${coord} - KILL! ✈️💥`);
+      AudioManager.playSFX('kill');
+      setPlayerStats(prev => ({...prev, hits: prev.hits + 1, kills: prev.kills + 1}));
+    }
+
+    setTurnCount(prev => prev + 1);
+
+    // Check if player won
+    if (board.areAllAirplanesDestroyed()) {
+      setWinner('Player');
+      setPhase('gameover');
+      addLog('🎉 YOU WIN! All enemy planes destroyed!');
+      AudioManager.stopBGM();
+      AudioManager.playSFX('victory');
+      showGameOverAd();
+
+      const finalPlayerStats = {
+        hits: playerStats.hits + (result.result !== GameConstants.ATTACK_RESULTS.MISS ? 1 : 0),
+        misses: playerStats.misses + (result.result === GameConstants.ATTACK_RESULTS.MISS ? 1 : 0),
+        kills: playerStats.kills + (result.result === GameConstants.ATTACK_RESULTS.KILL ? 1 : 0),
+      };
+
+      console.log('[GameScreen] Player won! Updating statistics...');
+      StatisticsService.updateStatistics(true, false).then(success => {
+        console.log('[GameScreen] Statistics update result:', success);
+      });
+      const historyData = {
+        gameType: 'ai',
+        opponent: `${difficulty.toUpperCase()} AI`,
+        winner: AuthService.getUserId() || 'Player',
+        boardSize: boardSize,
+        airplaneCount: airplaneCount,
+        totalTurns: turnCount + 1,
+        completedAt: Date.now(),
+        startedAt: gameStartedAtRef.current,
+        playerBoardData: playerBoard ? {
+          airplanes: playerBoard.airplanes.map(a => ({
+            id: a.id,
+            headRow: a.headRow,
+            headCol: a.headCol,
+            direction: a.direction,
+          })),
+          attacks: playerBoard.getAttackHistory(),
+        } : null,
+        aiBoardData: board ? {
+          airplanes: board.airplanes.map(a => ({
+            id: a.id,
+            headRow: a.headRow,
+            headCol: a.headCol,
+            direction: a.direction,
+          })),
+          attacks: board.getAttackHistory(),
+        } : null,
+        playerStats: finalPlayerStats,
+        aiStats: aiStats,
+      };
+
+      StatisticsService.saveGameHistory(historyData).then(success => {
+        console.log('[GameScreen] Game history save result (player wins):', success);
+        if (success) {
+          checkAchievements(historyData);
+        }
+      });
+
+      return;
+    }
+
+    // Switch to AI turn
+    setCurrentTurn('ai');
+    addLog("AI's turn...");
+
+    setTimeout(() => {
+      performAIAttack();
+    }, 800);
+  };
+
   // Perform random player attack on timeout
   const performRandomPlayerAttack = () => {
     if (!aiBoard || !playerBoard) return;
@@ -382,93 +505,24 @@ export default function GameScreen({navigation, route}: Props) {
     const randomIndex = Math.floor(Math.random() * unattackedCells.length);
     const {row, col} = unattackedCells[randomIndex];
 
-    // Process attack
+    // Process attack first to get result
     const result = aiBoard.processAttack(row, col);
     const coord = CoordinateSystem.positionToCoordinate(row, col);
+    const {targetX, targetY} = getTargetPosition(row, col);
+    const animType = getAnimResultType(result.result);
 
-    if (result.result === GameConstants.ATTACK_RESULTS.MISS) {
-      addLog(`Random attack ${coord} - MISS`);
-      AudioManager.playSFX('miss');
-      setPlayerStats(prev => ({...prev, misses: prev.misses + 1}));
-    } else if (result.result === GameConstants.ATTACK_RESULTS.HIT) {
-      addLog(`Random attack ${coord} - HIT! 🎯`);
-      AudioManager.playSFX('hit');
-      setPlayerStats(prev => ({...prev, hits: prev.hits + 1}));
-    } else if (result.result === GameConstants.ATTACK_RESULTS.KILL) {
-      addLog(`Random attack ${coord} - KILL! ✈️💥`);
-      AudioManager.playSFX('kill');
-      setPlayerStats(prev => ({...prev, hits: prev.hits + 1, kills: prev.kills + 1}));
-    }
-
-    setTurnCount(prev => prev + 1);
-
-    // Check if player won
-    if (aiBoard.areAllAirplanesDestroyed()) {
-      setWinner('Player');
-      setPhase('gameover');
-      addLog('🎉 YOU WIN! All enemy planes destroyed!');
-      AudioManager.stopBGM();
-      AudioManager.playSFX('victory');
-      showGameOverAd();
-
-      // Update statistics
-      console.log('[GameScreen] Player won! Updating statistics...');
-      StatisticsService.updateStatistics(true, false).then(success => {
-        console.log('[GameScreen] Statistics update result:', success);
+    if (bombRef.current) {
+      bombRef.current.playAttack(targetX, targetY, animType, () => {
+        processPostAttack(result, coord, true, aiBoard);
+      }, (dx: number) => {
+        shakeOffset.setValue(dx);
       });
-      // Save game history with board data
-      const historyData = {
-        gameType: 'ai',
-        opponent: `${difficulty.toUpperCase()} AI`,
-        winner: AuthService.getUserId() || 'Player',
-        boardSize: boardSize,
-        airplaneCount: airplaneCount,
-        totalTurns: turnCount + 1,
-        completedAt: Date.now(),
-        // Board snapshot data
-        playerBoardData: playerBoard ? {
-          airplanes: playerBoard.airplanes.map(a => ({
-            id: a.id,
-            headRow: a.headRow,
-            headCol: a.headCol,
-            direction: a.direction,
-          })),
-          attacks: playerBoard.getAttackHistory(), // AI's attacks on player board
-        } : null,
-        aiBoardData: aiBoard ? {
-          airplanes: aiBoard.airplanes.map(a => ({
-            id: a.id,
-            headRow: a.headRow,
-            headCol: a.headCol,
-            direction: a.direction,
-          })),
-          attacks: aiBoard.getAttackHistory(), // Player's attacks on AI board
-        } : null,
-        playerStats: playerStats,
-        aiStats: aiStats,
-      };
-
-      StatisticsService.saveGameHistory(historyData).then(success => {
-        console.log('[GameScreen] Game history save result (player wins):', success);
-        if (success) {
-          checkAchievements(historyData);
-        }
-      });
-
-      return;
+    } else {
+      processPostAttack(result, coord, true, aiBoard);
     }
-
-    // Switch to AI turn
-    setCurrentTurn('ai');
-    addLog("AI's turn...");
-
-    // AI attack after delay
-    setTimeout(() => {
-      performAIAttack();
-    }, 800);
   };
 
-  const handleCellPress = (row: number, col: number) => {
+  const handleCellPress = (row: number, col: number, pageX?: number, pageY?: number) => {
     if (phase !== 'battle' || currentTurn !== 'player' || !aiBoard || !playerBoard) {
       return;
     }
@@ -482,90 +536,25 @@ export default function GameScreen({navigation, route}: Props) {
     // Stop timer on player action
     stopTurnTimer();
 
-    // Process player attack
+    // Process player attack first to get the result
     const result = aiBoard.processAttack(row, col);
     const coord = CoordinateSystem.positionToCoordinate(row, col);
+    // Use actual touch coordinates if available, otherwise estimate
+    const fallback = getTargetPosition(row, col);
+    const targetX = pageX ?? fallback.targetX;
+    const targetY = pageY ?? fallback.targetY;
+    const animType = getAnimResultType(result.result);
 
-    if (result.result === GameConstants.ATTACK_RESULTS.MISS) {
-      addLog(`You attacked ${coord} - MISS`);
-      AudioManager.playSFX('miss');
-      setPlayerStats(prev => ({...prev, misses: prev.misses + 1}));
-    } else if (result.result === GameConstants.ATTACK_RESULTS.HIT) {
-      addLog(`You attacked ${coord} - HIT! 🎯`);
-      AudioManager.playSFX('hit');
-      setPlayerStats(prev => ({...prev, hits: prev.hits + 1}));
-    } else if (result.result === GameConstants.ATTACK_RESULTS.KILL) {
-      addLog(`You attacked ${coord} - KILL! ✈️💥`);
-      AudioManager.playSFX('kill');
-      setPlayerStats(prev => ({...prev, hits: prev.hits + 1, kills: prev.kills + 1}));
-    }
-
-    setTurnCount(prev => prev + 1);
-
-    // Check if player won
-    if (aiBoard.areAllAirplanesDestroyed()) {
-      setWinner('Player');
-      setPhase('gameover');
-      addLog('🎉 YOU WIN! All enemy planes destroyed!');
-      AudioManager.stopBGM();
-      AudioManager.playSFX('victory');
-      showGameOverAd();
-
-      // Update statistics
-      console.log('[GameScreen] Player won! Updating statistics...');
-      StatisticsService.updateStatistics(true, false).then(success => {
-        console.log('[GameScreen] Statistics update result:', success);
+    // Play bomb drop animation, then do post-attack in onComplete
+    if (bombRef.current) {
+      bombRef.current.playAttack(targetX, targetY, animType, () => {
+        processPostAttack(result, coord, false, aiBoard);
+      }, (dx: number) => {
+        shakeOffset.setValue(dx);
       });
-      // Save game history with board data
-      const historyData = {
-        gameType: 'ai',
-        opponent: `${difficulty.toUpperCase()} AI`,
-        winner: AuthService.getUserId() || 'Player',
-        boardSize: boardSize,
-        airplaneCount: airplaneCount,
-        totalTurns: turnCount + 1,
-        completedAt: Date.now(),
-        // Board snapshot data
-        playerBoardData: playerBoard ? {
-          airplanes: playerBoard.airplanes.map(a => ({
-            id: a.id,
-            headRow: a.headRow,
-            headCol: a.headCol,
-            direction: a.direction,
-          })),
-          attacks: playerBoard.getAttackHistory(), // AI's attacks on player board
-        } : null,
-        aiBoardData: aiBoard ? {
-          airplanes: aiBoard.airplanes.map(a => ({
-            id: a.id,
-            headRow: a.headRow,
-            headCol: a.headCol,
-            direction: a.direction,
-          })),
-          attacks: aiBoard.getAttackHistory(), // Player's attacks on AI board
-        } : null,
-        playerStats: playerStats,
-        aiStats: aiStats,
-      };
-
-      StatisticsService.saveGameHistory(historyData).then(success => {
-        console.log('[GameScreen] Game history save result (player wins):', success);
-        if (success) {
-          checkAchievements(historyData);
-        }
-      });
-
-      return;
+    } else {
+      processPostAttack(result, coord, false, aiBoard);
     }
-
-    // Switch to AI turn
-    setCurrentTurn('ai');
-    addLog("AI's turn...");
-
-    // AI attack after delay
-    setTimeout(() => {
-      performAIAttack();
-    }, 800);
   };
 
   const performAIAttack = () => {
@@ -613,6 +602,13 @@ export default function GameScreen({navigation, route}: Props) {
       AudioManager.playSFX('defeat');
       showGameOverAd();
 
+      // Compute final AI stats including this last attack
+      const finalAiStats = {
+        hits: aiStats.hits + (result.result !== GameConstants.ATTACK_RESULTS.MISS ? 1 : 0),
+        misses: aiStats.misses + (result.result === GameConstants.ATTACK_RESULTS.MISS ? 1 : 0),
+        kills: aiStats.kills + (result.result === GameConstants.ATTACK_RESULTS.KILL ? 1 : 0),
+      };
+
       // Update statistics
       console.log('[GameScreen] AI won! Updating statistics...');
       StatisticsService.updateStatistics(false, false).then(success => {
@@ -626,6 +622,7 @@ export default function GameScreen({navigation, route}: Props) {
         airplaneCount: airplaneCount,
         totalTurns: turnCount + 1,
         completedAt: Date.now(),
+        startedAt: gameStartedAtRef.current,
         // Board snapshot data
         playerBoardData: playerBoard ? {
           airplanes: playerBoard.airplanes.map(a => ({
@@ -646,7 +643,7 @@ export default function GameScreen({navigation, route}: Props) {
           attacks: aiBoard.getAttackHistory(), // Player's attacks on AI board
         } : null,
         playerStats: playerStats,
-        aiStats: aiStats,
+        aiStats: finalAiStats,
       };
 
       StatisticsService.saveGameHistory(historyData).then(success => {
@@ -811,7 +808,7 @@ export default function GameScreen({navigation, route}: Props) {
 
       {phase === 'battle' && playerBoard && aiBoard && (
         <ScrollView style={styles.contentScroll} contentContainerStyle={styles.contentScrollContainer}>
-          <View style={styles.battleContainer}>
+          <Animated.View style={[styles.battleContainer, {transform: [{translateX: shakeOffset}]}]}>
             <DualBoardView
               playerBoard={playerBoard}
               enemyBoard={aiBoard}
@@ -819,7 +816,7 @@ export default function GameScreen({navigation, route}: Props) {
               onCellPress={handleCellPress}
               showEnemyAirplanes={false}
             />
-          </View>
+          </Animated.View>
 
           <View style={styles.logContainer}>
             <Text style={styles.logTitle}>Game Log:</Text>
@@ -839,6 +836,8 @@ export default function GameScreen({navigation, route}: Props) {
           </TouchableOpacity>
         </ScrollView>
       )}
+
+      <BombDropAnimation ref={bombRef} />
 
       {phase === 'gameover' && (
         <View style={styles.gameoverContainer}>

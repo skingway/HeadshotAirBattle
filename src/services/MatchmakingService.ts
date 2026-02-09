@@ -239,6 +239,8 @@ class MatchmakingServiceClass {
       return;
     }
 
+    console.log('[MatchmakingService] tryMatchWithOpponent: checking for opponents, userId=', userId);
+
     try {
       // Get current user's queue entry
       const myEntrySnapshot = await firestore()
@@ -280,6 +282,16 @@ class MatchmakingServiceClass {
       }
 
       const opponent = this.selectBestOpponent(myEntry, opponents);
+      console.log('[MatchmakingService] Found opponent:', opponent.userId, 'my userId:', userId);
+
+      // Deterministic arbitration: only the player with smaller userId creates the match
+      // This prevents both players from simultaneously creating separate games
+      if (userId > opponent.userId) {
+        console.log('[MatchmakingService] Skipping match creation - opponent has priority (userId order)');
+        return;
+      }
+
+      console.log('[MatchmakingService] I have priority (smaller userId) - creating match');
 
       // Try to create match
       await this.createMatch(myEntry, opponent);

@@ -346,13 +346,18 @@ class MultiplayerServiceClass {
    */
   async setReady(ready: boolean): Promise<boolean> {
     if (!this.currentGame) {
+      console.log('[MultiplayerService] setReady failed: no current game');
       return false;
     }
 
     try {
       const { gameId, role } = this.currentGame;
-      await database().ref(`activeGames/${gameId}/${role}/ready`).set(ready);
-      console.log('[MultiplayerService] Ready status updated:', ready);
+      // Write both fields for cross-platform compatibility (iOS reads playerReady first)
+      await database().ref(`activeGames/${gameId}/${role}`).update({
+        ready: ready,
+        playerReady: ready,
+      });
+      console.log('[MultiplayerService] Ready status updated:', ready, 'for role:', role);
       return true;
     } catch (error) {
       console.error('[MultiplayerService] Error updating ready status:', error);
