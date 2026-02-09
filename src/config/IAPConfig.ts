@@ -7,7 +7,7 @@ import {Platform} from 'react-native';
 
 // Product IDs (must match Google Play Console / App Store Connect)
 export const PRODUCT_IDS = {
-  REMOVE_ADS: 'remove_ads',
+  REMOVE_ADS: 'remove_ads_v2',
   PREMIUM_SKIN_PACK: 'premium_skin_pack',
   PREMIUM_THEME_PACK: 'premium_theme_pack',
   ACE_PILOT_BUNDLE: 'ace_pilot_bundle',

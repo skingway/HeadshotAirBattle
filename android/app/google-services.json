@@ -23,6 +23,14 @@
           }
         },
         {
+          "client_id": "262233081033-mfj0a450gb4v8od5c077gl7r1j99dug3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.headshotairbattle",
+            "certificate_hash": "2bae8f6a61577502238e819ae8f4665515edce19"
+          }
+        },
+        {
           "client_id": "262233081033-blhdfeq6bf3s614oa5r6fou47p0irct3.apps.googleusercontent.com",
           "client_type": 3
         }
