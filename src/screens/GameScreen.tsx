@@ -76,6 +76,9 @@ export default function GameScreen({navigation, route}: Props) {
   const bombRef = useRef<BombDropAnimationRef>(null);
   const shakeOffset = useRef(new Animated.Value(0)).current;
 
+  // 防止快速点击导致同一回合多次攻击
+  const isProcessingAttackRef = useRef(false);
+
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -356,11 +359,13 @@ export default function GameScreen({navigation, route}: Props) {
   // Handle turn timeout
   const handleTurnTimeout = () => {
     if (phase !== 'battle') return;
+    if (isProcessingAttackRef.current) return;
 
     stopTurnTimer();
 
     if (currentTurn === 'player') {
       // Player timeout: make random attack
+      isProcessingAttackRef.current = true;
       addLog('⏱️ Time out! Random attack...');
       performRandomPlayerAttack();
     } else {
@@ -415,6 +420,7 @@ export default function GameScreen({navigation, route}: Props) {
 
     // Check if player won
     if (board.areAllAirplanesDestroyed()) {
+      isProcessingAttackRef.current = false;
       setWinner('Player');
       setPhase('gameover');
       addLog('🎉 YOU WIN! All enemy planes destroyed!');
@@ -527,11 +533,18 @@ export default function GameScreen({navigation, route}: Props) {
       return;
     }
 
+    // 防止快速点击同一回合多次攻击
+    if (isProcessingAttackRef.current) {
+      return;
+    }
+
     // Check if already attacked
     if (aiBoard.isCellAttacked(row, col)) {
       addLog('Already attacked this cell!');
       return;
     }
+
+    isProcessingAttackRef.current = true;
 
     // Stop timer on player action
     stopTurnTimer();
@@ -595,6 +608,7 @@ export default function GameScreen({navigation, route}: Props) {
 
     // Check if AI won
     if (playerBoard.areAllAirplanesDestroyed()) {
+      isProcessingAttackRef.current = false;
       setWinner('AI');
       setPhase('gameover');
       addLog('💀 GAME OVER! AI destroyed all your planes!');
@@ -657,6 +671,7 @@ export default function GameScreen({navigation, route}: Props) {
     }
 
     // Switch back to player
+    isProcessingAttackRef.current = false;
     setCurrentTurn('player');
     addLog("Your turn!");
 
